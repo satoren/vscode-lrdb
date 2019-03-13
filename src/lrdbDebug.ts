@@ -21,7 +21,7 @@ export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArgum
 
 	useInternalLua?: boolean;
 	port: number;
-	sourceRoot?: string;
+	sourceRoot?: string | string[];
 	stopOnEntry?: boolean;
 }
 
@@ -29,7 +29,7 @@ export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArgum
 export interface AttachRequestArguments extends DebugProtocol.AttachRequestArguments {
 	host: string;
 	port: number;
-	sourceRoot: string;
+	sourceRoot: string | string[];
 
 	stopOnEntry?: boolean;
 }
@@ -234,7 +234,7 @@ class LRDBChildProcessClient {
 
 export class LuaDebugSession extends DebugSession {
 
-	// Lua 
+	// Lua
 	private static THREAD_ID = 1;
 
 	private _debug_server_process: ChildProcess;
@@ -293,7 +293,7 @@ export class LuaDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	private setupSourceEnv(sourceRoot: string) {
+	private setupSourceEnv(sourceRoot: string[]) {
 		this.convertClientLineToDebugger = (line: number): number => {
 			return line;
 		}
@@ -302,7 +302,7 @@ export class LuaDebugSession extends DebugSession {
 		}
 
 		this.convertClientPathToDebugger = (clientPath: string): string => {
-			return path.relative(sourceRoot, clientPath);
+			return path.relative(sourceRoot[0], clientPath);
 		}
 		this.convertDebuggerPathToClient = (debuggerPath: string): string => {
 			if (!debuggerPath.startsWith("@")) { return ''; }
@@ -311,7 +311,7 @@ export class LuaDebugSession extends DebugSession {
 				return filename;
 			}
 			else {
-				return path.join(sourceRoot, filename);
+				return path.join(sourceRoot[0], filename);
 			}
 		}
 	}
@@ -319,7 +319,12 @@ export class LuaDebugSession extends DebugSession {
 	protected launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments): void {
 		this._stopOnEntry = args.stopOnEntry;
 		const cwd = args.cwd ? args.cwd : process.cwd();
-		const sourceRoot = args.sourceRoot ? args.sourceRoot : cwd;
+		var sourceRoot = args.sourceRoot ? args.sourceRoot : cwd;
+
+		if (typeof (sourceRoot) === "string") {
+			sourceRoot = [sourceRoot];
+		}
+
 		this.setupSourceEnv(sourceRoot);
 		const programArg = args.args ? args.args : [];
 
@@ -373,7 +378,13 @@ export class LuaDebugSession extends DebugSession {
 	protected attachRequest(response: DebugProtocol.AttachResponse, oargs: DebugProtocol.AttachRequestArguments): void {
 		let args = oargs as AttachRequestArguments;
 		this._stopOnEntry = args.stopOnEntry;
-		this.setupSourceEnv(args.sourceRoot);
+		var sourceRoot = args.sourceRoot;
+
+		if (typeof (sourceRoot) === "string") {
+			sourceRoot = [sourceRoot];
+		}
+
+		this.setupSourceEnv(sourceRoot);
 
 		this._debug_client = new LRDBTCPClient(args.port, args.host);
 		this._debug_client.on_event = (event: DebugServerEvent) => { this.handleServerEvents(event) };
@@ -700,7 +711,7 @@ export class LuaDebugSession extends DebugSession {
 		});
 		/*	}
 			else {
-	
+
 				response.body = {
 					result: `evaluate(context: '${args.context}', '${args.expression}')`,
 					variablesReference: 0
