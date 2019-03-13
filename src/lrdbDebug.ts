@@ -9,11 +9,6 @@ import { fork, spawn, ChildProcess } from 'child_process';
 import * as net from 'net';
 import * as path from 'path';
 
-import * as os from 'os';
-import * as stream from 'stream';
-import { stringify } from 'querystring';
-
-
 export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 
 	program: string;
