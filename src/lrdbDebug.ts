@@ -4,13 +4,14 @@ import {
 	Thread, StackFrame, Scope, Source, Handles, Breakpoint
 } from 'vscode-debugadapter';
 import { DebugProtocol } from 'vscode-debugprotocol';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { fork, spawn, ChildProcess } from 'child_process';
 import * as net from 'net';
 import * as path from 'path';
 
 import * as os from 'os';
 import * as stream from 'stream';
+import { stringify } from 'querystring';
 
 
 export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
@@ -302,6 +303,15 @@ class LuaDebugSession extends DebugSession {
 		}
 
 		this.convertClientPathToDebugger = (clientPath: string): string => {
+			for (let index = 0; index < sourceRoot.length; index++) {
+				var root = sourceRoot[index];
+				var resolvedRoot = path.resolve(root);
+				var resolvedClient = path.resolve(clientPath);
+				if (resolvedClient.startsWith(resolvedRoot))
+				{
+					return path.relative(resolvedRoot, resolvedClient);
+				}
+			}
 			return path.relative(sourceRoot[0], clientPath);
 		}
 		this.convertDebuggerPathToClient = (debuggerPath: string): string => {
@@ -311,6 +321,16 @@ class LuaDebugSession extends DebugSession {
 				return filename;
 			}
 			else {
+
+
+				if (sourceRoot.length > 1) {
+					for (let index = 0; index < sourceRoot.length; index++) {
+						var absolutePath = path.join(sourceRoot[index], filename);
+						if (existsSync(absolutePath)) {
+							return absolutePath
+						}
+					}
+				}
 				return path.join(sourceRoot[0], filename);
 			}
 		}
