@@ -38,7 +38,7 @@ function sequenceVariablesRequest(dc: DebugClient, varref: number, datapath: str
 
 // Defines a Mocha test suite to group tests of similar kind together
 suite("Lua Debug Adapter", () => {
-	const DEBUG_ADAPTER = './out/src/lrdbDebug.js';
+	const DEBUG_ADAPTER = './out/src/debugAdapter.js';
 	const PROJECT_ROOT = path.join(__dirname, '../../');
 	const DATA_ROOT = path.join(PROJECT_ROOT, 'test/lua/');
 

@@ -55,7 +55,7 @@
 			{
 				"type": "lrdb",
 				"label": "Lua Debug",
-				"program": "./out/src/lrdbDebug.js",
+				"program": "./out/src/debugAdapter.ts",
 				"runtime": "node",
 				"languages": [
 					"lua"

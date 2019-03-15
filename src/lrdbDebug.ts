@@ -232,7 +232,7 @@ class LRDBChildProcessClient {
 }
 
 
-class LuaDebugSession extends DebugSession {
+export class LuaDebugSession extends DebugSession {
 
 	// Lua 
 	private static THREAD_ID = 1;
@@ -721,4 +721,3 @@ class LuaDebugSession extends DebugSession {
 	}
 }
 
-DebugSession.run(LuaDebugSession);
