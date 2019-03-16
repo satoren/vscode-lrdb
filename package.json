@@ -2,7 +2,7 @@
 	"name": "lrdb",
 	"displayName": "LRDB",
 	"description": "Lua Remote DeBugger",
-	"version": "0.3.2",
+	"version": "0.3.4",
 	"publisher": "satoren",
 	"engines": {
 		"vscode": "^1.17.0",
@@ -55,7 +55,7 @@
 			{
 				"type": "lrdb",
 				"label": "Lua Debug",
-				"program": "./out/src/debugAdapter.ts",
+				"program": "./out/src/debugAdapter.js",
 				"runtime": "node",
 				"languages": [
 					"lua"
