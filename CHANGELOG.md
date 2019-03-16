@@ -2,6 +2,7 @@
 
 
 ## [Unreleased]
+## [0.3.4] - 2019-03-16
 ### Changed
 - Add support to multiple sourceRoots. Thanks @kinloth
 
