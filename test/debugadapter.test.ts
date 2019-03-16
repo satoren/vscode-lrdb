@@ -123,7 +123,8 @@ suite("Lua Debug Adapter", () => {
 		setup(() => {
 			const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua');
 			return Promise.all([
-					dc.launch({ program: PROGRAM, stopOnEntry: true }).then(() => dc.configurationSequence()),
+					dc.launch({ program: PROGRAM, stopOnEntry: true }),
+					dc.configurationSequence(),
 					dc.waitForEvent('stopped'),
 				]);
 		});
