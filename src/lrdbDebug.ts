@@ -370,7 +370,8 @@ export class LuaDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	protected attachRequest(response: DebugProtocol.AttachResponse, args: AttachRequestArguments): void {
+	protected attachRequest(response: DebugProtocol.AttachResponse, oargs: DebugProtocol.AttachRequestArguments): void {
+		let args = oargs as AttachRequestArguments;
 		this._stopOnEntry = args.stopOnEntry;
 		this.setupSourceEnv(args.sourceRoot);
 
@@ -720,4 +721,3 @@ export class LuaDebugSession extends DebugSession {
 		}
 	}
 }
-
