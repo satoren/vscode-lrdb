@@ -4,7 +4,7 @@
 
 This extension is debug Lua programs with Visual Studio Code.
 
-![Lua Debug](https://raw.githubusercontent.com/satoren/LRDB/master/vscode_extension/images/lrdb.gif)
+![Lua Debug](https://raw.githubusercontent.com/satoren/vscode-lrdb/master/images/lrdb.gif)
 
 ## Features
 
