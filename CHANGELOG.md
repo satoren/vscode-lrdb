@@ -2,6 +2,9 @@
 
 
 ## [Unreleased]
+### Changed
+- Add support to multiple sourceRoots. Thanks @kinloth
+
 ## [0.3.2] - 2018-01-28
 ### Fixed
 - Remove deprecated command
