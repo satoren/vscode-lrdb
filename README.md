@@ -35,6 +35,17 @@ launch.json example:
             "program": "${file}",
             "cwd": "${workspaceFolder}",
             "stopOnEntry": true
+        },
+        {
+            "type": "lrdb",
+            "request": "attach",
+            "host": "192.168.1.28",
+            "port": 21110,
+            "name": "attach to remote debugger",
+            "sourceRoot": "${workspaceFolder}",
+            "sourceFileMap": {
+                "${workspaceFolder}": "/mnt/luadb_b/"
+            }
         }
     ]
 }
