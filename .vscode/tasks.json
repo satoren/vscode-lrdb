@@ -17,7 +17,7 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "isBackground": false,
+            "isBackground": true,
             "type": "shell",
             "presentation": {
                 "echo": true,
