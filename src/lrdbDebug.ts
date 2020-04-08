@@ -306,9 +306,7 @@ export class LuaDebugSession extends DebugSession {
 
 					const relativePath = path.relative(resolvedSource, resolvedClient);
 					if (! relativePath.startsWith("..")) {
-						// BUG: LRDB doesn't support absolute paths, returning only relative
-						//return path.join(sourceFileMapTarget, relativePath);
-						return relativePath;
+						return path.join(sourceFileMapTarget, relativePath);
 					}
 				}
 			}
