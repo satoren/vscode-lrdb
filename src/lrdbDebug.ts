@@ -305,7 +305,7 @@ export class LuaDebugSession extends DebugSession {
 					const resolvedClient = path.resolve(clientPath);
 
 					const relativePath = path.relative(resolvedSource, resolvedClient);
-					if (! relativePath.startsWith("..")) {
+					if (! relativePath.startsWith("..")) { // client is child of source
 						return path.join(sourceFileMapTarget, relativePath);
 					}
 				}
@@ -323,7 +323,7 @@ export class LuaDebugSession extends DebugSession {
 					const sourceFileMapTarget: string = sourceFileMap[sourceFileMapSource];
 
 					const relativePath = path.relative(sourceFileMapTarget, debuggerPath);
-					if (! relativePath.startsWith("..")) {
+					if (! relativePath.startsWith("..")) { // debuggerPath is child of target
 						return path.join(sourceFileMapSource, relativePath);
 					}
 				}
