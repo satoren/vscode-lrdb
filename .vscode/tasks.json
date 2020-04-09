@@ -33,6 +33,20 @@
                 "silent"
             ],
             "problemMatcher": "$tsc-watch"
+        },
+        {
+            "label": "Package into VSIX",
+            "group": "build",
+            "isBackground": false,
+            "type": "shell",
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "command": "vsce",
+            "args": ["package"]
         }
     ]    
 }
