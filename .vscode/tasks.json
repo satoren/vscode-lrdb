@@ -37,12 +37,9 @@
         {
             "label": "Package into VSIX",
             "group": "build",
-            "isBackground": false,
             "type": "shell",
             "presentation": {
-                "echo": true,
-                "reveal": "silent",
-                "focus": false,
+                "reveal": "always",
                 "panel": "shared"
             },
             "command": "vsce",
