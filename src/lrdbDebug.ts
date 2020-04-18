@@ -250,6 +250,8 @@ export class LuaDebugSession extends DebugSession {
 
 	private _stopOnEntry: boolean;
 
+	private _working_directory: string;
+
 
 	/**
 	 * Creates a new debug adapter that is used for one debug session.
@@ -744,6 +746,9 @@ export class LuaDebugSession extends DebugSession {
 			this.sendEvent(new ContinuedEvent(LuaDebugSession.THREAD_ID));
 		}
 		else if (event.method == "exit") {
+		}
+		else if (event.method == "connected") { 
+			this._working_directory = event.params.working_directory;
 		}
 	}
 }
