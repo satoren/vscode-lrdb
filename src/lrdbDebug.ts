@@ -10,14 +10,14 @@ import * as net from 'net';
 import * as path from 'path';
 
 export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
-
 	program: string;
 	args: string[];
 	cwd: string;
 
 	useInternalLua?: boolean;
 	port: number;
-	sourceRoot?: string | string[];
+	sourceRoot?: string;
+	sourceFileMap?: object;
 	stopOnEntry?: boolean;
 }
 
@@ -25,8 +25,8 @@ export interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArgum
 export interface AttachRequestArguments extends DebugProtocol.AttachRequestArguments {
 	host: string;
 	port: number;
-	sourceRoot: string | string[];
-
+	sourceRoot: string;
+	sourceFileMap?: object;
 	stopOnEntry?: boolean;
 }
 
@@ -250,6 +250,8 @@ export class LuaDebugSession extends DebugSession {
 
 	private _stopOnEntry: boolean;
 
+	private _working_directory: string;
+
 
 	/**
 	 * Creates a new debug adapter that is used for one debug session.
@@ -289,7 +291,7 @@ export class LuaDebugSession extends DebugSession {
 		this.sendResponse(response);
 	}
 
-	private setupSourceEnv(sourceRoot: string[]) {
+	private setupSourceEnv(sourceRoot: string, sourceFileMap?: object) {
 		this.convertClientLineToDebugger = (line: number): number => {
 			return line;
 		}
@@ -298,35 +300,41 @@ export class LuaDebugSession extends DebugSession {
 		}
 
 		this.convertClientPathToDebugger = (clientPath: string): string => {
-			for (let index = 0; index < sourceRoot.length; index++) {
-				var root = sourceRoot[index];
-				var resolvedRoot = path.resolve(root);
-				var resolvedClient = path.resolve(clientPath);
-				if (resolvedClient.startsWith(resolvedRoot))
-				{
-					return path.relative(resolvedRoot, resolvedClient);
-				}
-			}
-			return path.relative(sourceRoot[0], clientPath);
-		}
-		this.convertDebuggerPathToClient = (debuggerPath: string): string => {
-			if (!debuggerPath.startsWith("@")) { return ''; }
-			const filename: string = debuggerPath.substr(1);
-			if (path.isAbsolute(filename)) {
-				return filename;
-			}
-			else {
+			if (sourceFileMap) {
+				for (const sourceFileMapSource of Object.keys(sourceFileMap)) {
+					const sourceFileMapTarget: string = sourceFileMap[sourceFileMapSource];
+					const resolvedSource = path.resolve(sourceFileMapSource);
+					const resolvedClient = path.resolve(clientPath);
 
-
-				if (sourceRoot.length > 1) {
-					for (let index = 0; index < sourceRoot.length; index++) {
-						var absolutePath = path.join(sourceRoot[index], filename);
-						if (existsSync(absolutePath)) {
-							return absolutePath
-						}
+					const relativePath = path.relative(resolvedSource, resolvedClient);
+					if (! relativePath.startsWith("..")) { // client is child of source
+						return path.join(sourceFileMapTarget, relativePath);
 					}
 				}
-				return path.join(sourceRoot[0], filename);
+			}
+
+			return path.relative(sourceRoot, clientPath);
+		}
+
+		this.convertDebuggerPathToClient = (argDebuggerPath: string): string => {
+			if (!argDebuggerPath.startsWith("@")) { return ''; }
+			const debuggerPath = argDebuggerPath.substr(1);
+
+			if (sourceFileMap) {
+				for (const sourceFileMapSource of Object.keys(sourceFileMap)) {
+					const sourceFileMapTarget: string = sourceFileMap[sourceFileMapSource];
+
+					const relativePath = path.relative(sourceFileMapTarget, debuggerPath);
+					if (! relativePath.startsWith("..")) { // debuggerPath is child of target
+						return path.join(sourceFileMapSource, relativePath);
+					}
+				}
+			}
+
+			if (path.isAbsolute(debuggerPath)) {
+				return debuggerPath;
+			} else {
+				return path.join(sourceRoot, debuggerPath);
 			}
 		}
 	}
@@ -335,12 +343,9 @@ export class LuaDebugSession extends DebugSession {
 		this._stopOnEntry = args.stopOnEntry;
 		const cwd = args.cwd ? args.cwd : process.cwd();
 		var sourceRoot = args.sourceRoot ? args.sourceRoot : cwd;
+		var sourceFileMap = args.sourceFileMap;
 
-		if (typeof (sourceRoot) === "string") {
-			sourceRoot = [sourceRoot];
-		}
-
-		this.setupSourceEnv(sourceRoot);
+		this.setupSourceEnv(sourceRoot, sourceFileMap);
 		const programArg = args.args ? args.args : [];
 
 		const port = args.port ? args.port : 21110;
@@ -394,12 +399,9 @@ export class LuaDebugSession extends DebugSession {
 		let args = oargs as AttachRequestArguments;
 		this._stopOnEntry = args.stopOnEntry;
 		var sourceRoot = args.sourceRoot;
+		var sourceFileMap = args.sourceFileMap;
 
-		if (typeof (sourceRoot) === "string") {
-			sourceRoot = [sourceRoot];
-		}
-
-		this.setupSourceEnv(sourceRoot);
+		this.setupSourceEnv(sourceRoot, sourceFileMap);
 
 		this._debug_client = new LRDBTCPClient(args.port, args.host);
 		this._debug_client.on_event = (event: DebugServerEvent) => { this.handleServerEvents(event) };
@@ -744,6 +746,9 @@ export class LuaDebugSession extends DebugSession {
 			this.sendEvent(new ContinuedEvent(LuaDebugSession.THREAD_ID));
 		}
 		else if (event.method == "exit") {
+		}
+		else if (event.method == "connected") { 
+			this._working_directory = event.params.working_directory;
 		}
 	}
 }

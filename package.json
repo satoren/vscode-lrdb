@@ -117,9 +117,16 @@
 								"default": null
 							},
 							"sourceRoot": {
-								"type": ["string", "array"],
-								"description": "script source root directory. to be used in souce file matching at breakpoints.",
+								"type": "string",
+								"description": "script source root directory.",
 								"default": "${workspaceFolder}"
+							},
+							"sourceFileMap": {
+								"type": "object",
+								"description": "Optional source file mappings passed to the debug engine. Example: '{ \"/original/source/path\":\"/current/source/path\" }'",
+								"default": {
+								  "<source-path>": "<target-path>"
+								}
 							},
 							"stopOnEntry": {
 								"type": "boolean",
@@ -145,12 +152,16 @@
 								"default": 21110
 							},
 							"sourceRoot": {
-								"type": [
-									"string",
-									"array"
-								],
+								"type": "string",
 								"description": "script source root directory.",
 								"default": "${workspaceFolder}"
+							},
+							"sourceFileMap": {
+								"type": "object",
+								"description": "Optional source file mappings passed to the debug engine. Example: '{ \"/original/source/path\":\"/current/source/path\" }'",
+								"default": {
+								  "<source-path>": "<target-path>"
+								}
 							},
 							"stopOnEntry": {
 								"type": "boolean",

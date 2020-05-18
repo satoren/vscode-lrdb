@@ -1,5 +1,13 @@
 # Lua Remote DeBugger for Visual Studio Code
 
+## Fork changes
+
+This fork is modified to use absolute paths from LRDB debugger instead of relative.
+It also defines new `launch.json` property - sourceFileMap for translating
+remote paths to local and vice-versa.
+
+This fork works only with similarly modified LRDB - [kapecp/LRDB](https://github.com/kapecp/lrdb).
+
 ## Introduction
 
 This extension is debug Lua programs with Visual Studio Code.
@@ -35,6 +43,17 @@ launch.json example:
             "program": "${file}",
             "cwd": "${workspaceFolder}",
             "stopOnEntry": true
+        },
+        {
+            "type": "lrdb",
+            "request": "attach",
+            "host": "192.168.1.28",
+            "port": 21110,
+            "name": "attach to remote debugger",
+            "sourceRoot": "${workspaceFolder}",
+            "sourceFileMap": {
+                "${workspaceFolder}": "/mnt/luadb_b/"
+            }
         }
     ]
 }
