@@ -1,0 +1,129 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Lua Debug Adapter breakpoint should stop on breakpoint 1`] = `
+Array [
+  Object {
+    "command": "configurationDone",
+    "request_seq": 4,
+    "seq": 5,
+    "success": true,
+    "type": "response",
+  },
+  Object {
+    "command": "launch",
+    "request_seq": 2,
+    "seq": 2,
+    "success": true,
+    "type": "response",
+  },
+  Object {
+    "body": Object {
+      "stackFrames": Array [
+        Object {
+          "column": 0,
+          "id": 0,
+          "line": 5,
+          "name": "testfn",
+          "source": Object {
+            "name": "test/lua/loop_test.lua",
+            "path": "/Users/masataka/projects/vscode-lrdb/test/lua/loop_test.lua",
+            "sourceReference": 0,
+          },
+        },
+        Object {
+          "column": 0,
+          "id": 1,
+          "line": 11,
+          "name": "main",
+          "source": Object {
+            "name": "test/lua/loop_test.lua",
+            "path": "/Users/masataka/projects/vscode-lrdb/test/lua/loop_test.lua",
+            "sourceReference": 0,
+          },
+        },
+      ],
+      "totalFrames": 2,
+    },
+    "command": "stackTrace",
+    "request_seq": 5,
+    "seq": 11,
+    "success": true,
+    "type": "response",
+  },
+]
+`;
+
+exports[`Lua Debug Adapter launch should run program to the end 1`] = `
+Array [
+  Object {
+    "command": "launch",
+    "request_seq": 2,
+    "seq": 2,
+    "success": true,
+    "type": "response",
+  },
+  Object {
+    "command": "configurationDone",
+    "request_seq": 3,
+    "seq": 4,
+    "success": true,
+    "type": "response",
+  },
+  Object {
+    "event": "terminated",
+    "seq": 10,
+    "type": "event",
+  },
+]
+`;
+
+exports[`Lua Debug Adapter launch should stop on entry 1`] = `
+Array [
+  Object {
+    "command": "launch",
+    "request_seq": 2,
+    "seq": 2,
+    "success": true,
+    "type": "response",
+  },
+  Object {
+    "command": "configurationDone",
+    "request_seq": 3,
+    "seq": 4,
+    "success": true,
+    "type": "response",
+  },
+  Object {
+    "body": Object {
+      "reason": "entry",
+      "threadId": 1,
+    },
+    "event": "stopped",
+    "seq": 5,
+    "type": "event",
+  },
+  Object {
+    "body": Object {
+      "stackFrames": Array [
+        Object {
+          "column": 0,
+          "id": 0,
+          "line": 1,
+          "name": "main",
+          "source": Object {
+            "name": "test/lua/loop_test.lua",
+            "path": "/Users/masataka/projects/vscode-lrdb/test/lua/loop_test.lua",
+            "sourceReference": 0,
+          },
+        },
+      ],
+      "totalFrames": 1,
+    },
+    "command": "stackTrace",
+    "request_seq": 4,
+    "seq": 9,
+    "success": true,
+    "type": "response",
+  },
+]
+`;

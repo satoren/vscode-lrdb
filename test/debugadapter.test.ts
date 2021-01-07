@@ -4,13 +4,12 @@
 //
 
 // The module 'assert' provides assertion methods from node
-import * as assert from 'assert'
 import * as path from 'path'
 
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 import { DebugClient } from 'vscode-debugadapter-testsupport'
-import { DebugProtocol } from 'vscode-debugprotocol'
+//import { DebugProtocol } from 'vscode-debugprotocol'
 
 function sequenceVariablesRequest(
   dc: DebugClient,
@@ -28,8 +27,7 @@ function sequenceVariablesRequest(
           })
         }
       }
-      assert.ok(
-        false,
+      throw Error(
         'not found:' + p + ' in ' + JSON.stringify(response.body.variables)
       )
     })
@@ -40,8 +38,7 @@ function sequenceVariablesRequest(
         return va
       }
     }
-    assert.ok(
-      false,
+    throw Error(
       'not found:' + last + ' in ' + JSON.stringify(response.body.variables)
     )
   })
@@ -49,7 +46,7 @@ function sequenceVariablesRequest(
 
 // Defines a Mocha test describe to group tests of similar kind together
 describe('Lua Debug Adapter', () => {
-  const DEBUG_ADAPTER = './out/src/debugAdapter.js'
+  const DEBUG_ADAPTER = './out/debugAdapter.js'
   const PROJECT_ROOT = path.join(__dirname, '../')
   const DATA_ROOT = path.join(PROJECT_ROOT, 'test/lua/')
 
@@ -63,139 +60,139 @@ describe('Lua Debug Adapter', () => {
   afterEach(() => dc.stop())
 
   describe('basic', () => {
-    test('unknown request should produce error', (done) => {
-      dc.send('illegal_request')
-        .then(() => {
-          done(new Error('does not report error on unknown request'))
-        })
-        .catch(() => {
-          done()
-        })
+    test('unknown request should produce error', async () => {
+      const response = dc.send('illegal_request')
+
+      await expect(response).rejects.toThrow()
     })
   })
 
   describe('initialize', () => {
-    test('should return supported features', () => {
-      return dc.initializeRequest().then((response) => {
-        assert.equal(response.body.supportsConfigurationDoneRequest, true)
-      })
+    test('should return supported features', async () => {
+      const response = await dc.initializeRequest()
+      expect(response.body.supportsConfigurationDoneRequest).toBe(true)
     })
 
-    test("should produce error for invalid 'pathFormat'", (done) => {
-      dc.initializeRequest({
+    test("should produce error for invalid 'pathFormat'", async () => {
+      const response = dc.initializeRequest({
         adapterID: 'lua',
         linesStartAt1: true,
         columnsStartAt1: true,
         pathFormat: 'url',
       })
-        .then((response) => {
-          done(
-            new Error("does not report error on invalid 'pathFormat' attribute")
-          )
-        })
-        .catch((err) => {
-          // error expected
-          done()
-        })
+      await expect(response).rejects.toThrow()
     })
   })
 
   describe('launch', () => {
-    test('should run program to the end', () => {
+    test('should run program to the end', async () => {
       const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua')
 
-      return Promise.all([
+      const response = await Promise.all([
         dc.launch({ program: PROGRAM }),
         dc.configurationSequence(),
         dc.waitForEvent('terminated'),
       ])
+
+      expect(response).toMatchSnapshot()
     })
 
-    test('should stop on entry', () => {
+    test('should stop on entry', async () => {
       const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua')
       const ENTRY_LINE = 1
-      return Promise.all([
+      const response = await Promise.all([
         dc.launch({ program: PROGRAM, stopOnEntry: true }),
         dc.configurationSequence(),
         dc.waitForEvent('stopped'),
         dc.assertStoppedLocation('entry', { line: ENTRY_LINE }),
       ])
+      expect(response).toMatchSnapshot()
     })
   })
 
   describe('breakpoint', () => {
-    test('should stop on breakpoint', () => {
+    test('should stop on breakpoint', async () => {
       const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua')
       const BREAK_LINE = 5
-      return dc.hitBreakpoint(
+      const response = await dc.hitBreakpoint(
         { program: PROGRAM },
         { path: PROGRAM, line: BREAK_LINE }
       )
+      expect(response).toMatchSnapshot()
     })
   })
   describe('evaluate', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua')
-      return Promise.all([
+      await Promise.all([
         dc.launch({ program: PROGRAM, stopOnEntry: true }),
         dc.configurationSequence(),
         dc.waitForEvent('stopped'),
       ])
     })
-    test('check evaluate results', () => {
-      const evaltests = []
-      evaltests.push(
-        dc
-          .evaluateRequest({
-            expression: '{{1}}',
-            context: 'watch',
-            frameId: 0,
-          })
-          .then((response) => {
-            return sequenceVariablesRequest(
-              dc,
-              response.body.variablesReference,
-              ['1', '1']
-            ).then((va) => {
-              assert.equal(va.value, '1')
-            })
-          })
-      )
-      evaltests.push(
-        dc
-          .evaluateRequest({
-            expression: '{{{5,4}}}',
-            context: 'watch',
-            frameId: 0,
-          })
-          .then((response) => {
-            return sequenceVariablesRequest(
-              dc,
-              response.body.variablesReference,
-              ['1', '1', '2']
-            ).then((va) => {
-              assert.equal(va.value, '4')
-            })
-          })
-      )
-      evaltests.push(
-        dc
-          .evaluateRequest({
-            expression: '{a={4,2}}',
-            context: 'watch',
-            frameId: 0,
-          })
-          .then((response) => {
-            return sequenceVariablesRequest(
-              dc,
-              response.body.variablesReference,
-              ['a', '2']
-            ).then((va) => {
-              assert.equal(va.value, '2')
-            })
-          })
-      )
-      return Promise.all(evaltests)
+    test('check watch results 1', async () => {
+      const response = await dc
+        .evaluateRequest({
+          expression: '{{1}}',
+          context: 'watch',
+          frameId: 0,
+        })
+        .then((response) =>
+          sequenceVariablesRequest(dc, response.body.variablesReference, [
+            '1',
+            '1',
+          ])
+        )
+      expect(response.value).toBe('1')
+    })
+
+    test('watch array value [1][1]', async () => {
+      const response = await dc
+        .evaluateRequest({
+          expression: '{{1}}',
+          context: 'watch',
+          frameId: 0,
+        })
+        .then((response) =>
+          sequenceVariablesRequest(dc, response.body.variablesReference, [
+            '1',
+            '1',
+          ])
+        )
+      expect(response.value).toBe('1')
+    })
+
+    test('watch array value [1][1][3]', async () => {
+      const response = await dc
+        .evaluateRequest({
+          expression: '{{{5,4}}}',
+          context: 'watch',
+          frameId: 0,
+        })
+        .then((response) => {
+          return sequenceVariablesRequest(
+            dc,
+            response.body.variablesReference,
+            ['1', '1', '2']
+          )
+        })
+      expect(response.value).toBe('4')
+    })
+    test('watch object value ["a"][2]', async () => {
+      const response = await dc
+        .evaluateRequest({
+          expression: '{a={4,2}}',
+          context: 'watch',
+          frameId: 0,
+        })
+        .then((response) => {
+          return sequenceVariablesRequest(
+            dc,
+            response.body.variablesReference,
+            ['a', '2']
+          )
+        })
+      expect(response.value).toBe('2')
     })
   })
 
@@ -215,62 +212,46 @@ describe('Lua Debug Adapter', () => {
             return scope
           }
         }
-        assert.ok(false, 'upvalue not found')
+        throw Error('upvalue not found')
       })
     }
-    test('check upvalue a', () => {
-      const evaltests = []
-
-      evaltests.push(
-        getUpvalueScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            'a',
-          ]).then((va) => {
-            assert.equal(va.value, '1')
-          })
-        })
-      )
-      return Promise.all(evaltests)
+    test('check upvalue a', async () => {
+      const response = await getUpvalueScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, ['a'])
+      })
+      expect(response.value).toBe('1')
     })
-    test('check upvalue table', () => {
-      const evaltests = []
-
+    test('check upvalue table ["t"][1][1]', async () => {
       //local t={{1,2,3,4},5,6}
-      evaltests.push(
-        getUpvalueScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            't',
-            '1',
-            '1',
-          ]).then((va) => {
-            assert.equal(va.value, '1')
-          })
-        })
-      )
+      const response = await getUpvalueScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, [
+          't',
+          '1',
+          '1',
+        ])
+      })
 
-      evaltests.push(
-        getUpvalueScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            't',
-            '1',
-            '3',
-          ]).then((va) => {
-            assert.equal(va.value, '3')
-          })
-        })
-      )
-      evaltests.push(
-        getUpvalueScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            't',
-            '2',
-          ]).then((va) => {
-            assert.equal(va.value, '5')
-          })
-        })
-      )
+      expect(response.value).toBe('1')
+    })
 
-      return Promise.all(evaltests)
+    test('check upvalue table ["t"][1][3]', async () => {
+      const response = await getUpvalueScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, [
+          't',
+          '1',
+          '3',
+        ])
+      })
+      expect(response.value).toBe('3')
+    })
+    test('check upvalue table ["t"][2]', async () => {
+      const response = await getUpvalueScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, [
+          't',
+          '2',
+        ])
+      })
+      expect(response.value).toBe('5')
     })
   })
 
@@ -290,50 +271,43 @@ describe('Lua Debug Adapter', () => {
             return scope
           }
         }
-        assert.ok(false, 'upvalue not found')
+        throw Error('local value not found')
       })
     }
-    test('check local', () => {
-      const evaltests = []
 
-      evaltests.push(
-        getLocalScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            'local_value1',
-          ]).then((va) => {
-            assert.equal(va.value, '1')
-          })
-        })
-      )
-      evaltests.push(
-        getLocalScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            'local_value2',
-          ]).then((va) => {
-            assert.equal(va.value, '"abc"')
-          })
-        })
-      )
-      evaltests.push(
-        getLocalScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            'local_value3',
-          ]).then((va) => {
-            assert.equal(va.value, '1')
-          })
-        })
-      )
-      evaltests.push(
-        getLocalScope(0).then((scope) => {
-          return sequenceVariablesRequest(dc, scope.variablesReference, [
-            'local_value4',
-            '1',
-          ]).then((va) => {
-            assert.equal(va.value, '4234.3')
-          })
-        })
-      )
-      return Promise.all(evaltests)
+    test('get local_value1', async () => {
+      const response = await getLocalScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, [
+          'local_value1',
+        ])
+      })
+
+      expect(response.value).toBe('1')
+    })
+    test('get local_value2', async () => {
+      const response = await getLocalScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, [
+          'local_value2',
+        ])
+      })
+      expect(response.value).toBe('"abc"')
+    })
+    test('get local_value3', async () => {
+      const response = await getLocalScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, [
+          'local_value3',
+        ])
+      })
+      expect(response.value).toBe('1')
+    })
+    test('get local_value4', async () => {
+      const response = await getLocalScope(0).then((scope) => {
+        return sequenceVariablesRequest(dc, scope.variablesReference, [
+          'local_value4',
+          '1',
+        ])
+      })
+      expect(response.value).toBe('4234.3')
     })
   })
 })
