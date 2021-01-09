@@ -11,265 +11,97 @@ import {
   Source,
   Handles,
   Breakpoint,
-} from "vscode-debugadapter";
-import { DebugProtocol } from "vscode-debugprotocol";
-import { readFileSync, existsSync } from "fs";
-import { spawn, ChildProcess } from "child_process";
-import * as net from "net";
-import * as path from "path";
-import { LuaWasm } from 'lrdb-debuggable-lua'
+} from 'vscode-debugadapter'
+import { DebugProtocol } from 'vscode-debugprotocol'
+import { readFileSync, existsSync } from 'fs'
+import { spawn, ChildProcess } from 'child_process'
+import * as path from 'path'
+import { LuaWasm, LRDBAdapter, LRDBClient } from 'lrdb-debuggable-lua'
 
 export interface LaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
-  program: string;
-  args: string[];
-  cwd: string;
+  program: string
+  args: string[]
+  cwd: string
 
-  useInternalLua?: boolean;
-  port: number;
-  sourceRoot?: string | string[];
-  stopOnEntry?: boolean;
+  useInternalLua?: boolean
+  port: number
+  sourceRoot?: string | string[]
+  stopOnEntry?: boolean
 }
 
 export interface AttachRequestArguments
   extends DebugProtocol.AttachRequestArguments {
-  host: string;
-  port: number;
-  sourceRoot: string | string[];
+  host: string
+  port: number
+  sourceRoot: string | string[]
 
-  stopOnEntry?: boolean;
+  stopOnEntry?: boolean
 }
 
-export interface DebugServerEvent {
-  method: string;
-  params: any;
-  param?: any; //
-  error?: any;
-  id: any;
+type GetLocalVariableParam = {
+  type: 'get_local_variable'
+  params: Parameters<LRDBClient.Client['getLocalVariable']>[0]
+}
+type GetGlobalParam = {
+  type: 'get_global'
+  params: Parameters<LRDBClient.Client['getGlobal']>[0]
+}
+type GetUpvaluesParam = {
+  type: 'get_upvalues'
+  params: Parameters<LRDBClient.Client['getUpvalues']>[0]
+}
+type EvalParam = {
+  type: 'eval'
+  params: Parameters<LRDBClient.Client['eval']>[0]
 }
 
-class VariableReference {
-  public constructor(
-    public msg_name: string,
-    public msg_param: any,
-    public datapath: string[]
-  ) {}
-}
+type VariableReference =
+  | GetLocalVariableParam
+  | GetGlobalParam
+  | GetUpvaluesParam
+  | EvalParam
 
-interface LRDBClient {
-  send(method: string, param?: any, callback?: (response: any) => void);
-  end();
-  on_event: (event: DebugServerEvent) => void;
-  on_close: () => void;
-  on_open: () => void;
-  on_error: (e: any) => void;
-  on_data: (data: string) => void;
-}
 
-class LRDBTCPClient {
-  private _connection: net.Socket;
-
-  private _callback_map = {};
-  private _request_id = 0;
-  private _end = false;
-
-  private on_close_() {
-    for (const key in this._callback_map) {
-      this._callback_map[key]({ result: null, id: key });
-      delete this._callback_map[key];
-    }
-
-    if (this.on_close) {
-      this.on_close();
-    }
-  }
-  private on_connect_() {
-    this._connection.on("close", () => {
-      this.on_close_();
-    });
-    if (this.on_open) {
-      this.on_open();
-    }
-  }
-
-  public constructor(port: number, host: string) {
-    this._connection = net.connect(port, host);
-    this._connection.on("connect", () => {
-      this.on_connect_();
-    });
-
-    let retryCount = 0;
-    this._connection.on("error", (e: any) => {
-      if (e.code == "ECONNREFUSED" && retryCount < 5) {
-        retryCount++;
-        this._connection.setTimeout(1000, () => {
-          if (!this._end) {
-            this._connection.connect(port, host);
-          }
-        });
-        return;
-      }
-
-      console.error(e.message);
-      if (this.on_error) {
-        this.on_error(e);
-      }
-    });
-
-    let chunk = "";
-    const ondata = (data) => {
-      chunk += data.toString();
-      let d_index = chunk.indexOf("\n");
-      while (d_index > -1) {
-        try {
-          const string = chunk.substring(0, d_index);
-          const json = JSON.parse(string);
-          this.receive(json);
-        } finally {
-          // no 
-        }
-        chunk = chunk.substring(d_index + 1);
-        d_index = chunk.indexOf("\n");
-      }
-    };
-    this._connection.on("data", ondata);
-  }
-
-  public send(method: string, param?: any, callback?: (response: any) => void) {
-    const id = this._request_id++;
-    //TODO need remove param
-    const data =
-      JSON.stringify({
-        jsonrpc: "2.0",
-        method: method,
-        params: param,
-        param: param,
-        id: id,
-      }) + "\n";
-    const ret = this._connection.write(data);
-
-    if (callback) {
-      if (ret) {
-        this._callback_map[id] = callback;
-      } else {
-        setTimeout(function () {
-          callback({ result: null, id: id });
-        }, 0);
-      }
-    }
-  }
-  public receive(event: DebugServerEvent) {
-    if (this._callback_map[event.id]) {
-      this._callback_map[event.id](event);
-      delete this._callback_map[event.id];
+  function stringify(value: unknown): string {
+    if (value == null) {
+      return 'nil'
+    } else if (value == undefined) {
+      return 'none'
     } else {
-      if (this.on_event) {
-        this.on_event(event);
-      }
+      return JSON.stringify(value)
     }
   }
-  public end() {
-    this._end = true;
-    this._connection.end();
-  }
-
-  on_event: (event: DebugServerEvent) => void;
-  on_data: (data: string) => void;
-  on_close: () => void;
-  on_open: () => void;
-  on_error: (e: any) => void;
-}
-
-class LRDBChildProcessClient {
-  private _callback_map = {};
-  private _request_id = 0;
-
-  public constructor(private _child: ChildProcess) {
-    setTimeout(() => {
-      if (this.on_open) {
-        this.on_open();
-      }
-    }, 0);
-    _child.on("message", (msg) => {
-      this.receive(msg);
-    });
-  }
-
-  public send(method: string, param?: any, callback?: (response: any) => void) {
-    const id = this._request_id++;
-
-    const ret = this._child.send({
-      jsonrpc: "2.0",
-      method: method,
-      params: param,
-      id: id,
-    });
-
-    if (callback) {
-      if (ret) {
-        this._callback_map[id] = callback;
-      } else {
-        setTimeout(function () {
-          callback({ result: null, id: id });
-        }, 0);
-      }
-    }
-  }
-  public receive(event: DebugServerEvent) {
-    if (event.params == null) {
-      event.params = event.param;
-    }
-    if (this._callback_map[event.id]) {
-      this._callback_map[event.id](event);
-      delete this._callback_map[event.id];
-    } else {
-      if (this.on_event) {
-        this.on_event(event);
-      }
-    }
-  }
-  public end() {
-    for (const key in this._callback_map) {
-      this._callback_map[key]({ result: null, id: key });
-      delete this._callback_map[key];
-    }
-  }
-  on_event: (event: DebugServerEvent) => void;
-  on_data: (data: string) => void;
-  on_close: () => void;
-  on_open: () => void;
-  on_error: (e: any) => void;
-}
 
 export class LuaDebugSession extends DebugSession {
   // Lua
-  private static THREAD_ID = 1;
+  private static THREAD_ID = 1
 
-  private _debug_server_process: ChildProcess;
+  private _debug_server_process: ChildProcess
 
-  private _debug_client: LRDBClient;
+  private _debug_client: LRDBClient.Client
 
   // maps from sourceFile to array of Breakpoints
-  private _breakPoints = new Map<string, DebugProtocol.Breakpoint[]>();
+  private _breakPoints = new Map<string, DebugProtocol.Breakpoint[]>()
 
-  private _breakPointID = 1000;
+  private _breakPointID = 1000
 
-  private _variableHandles = new Handles<VariableReference>();
+  private _variableHandles = new Handles<VariableReference>()
 
-  private _sourceHandles = new Handles<string>();
+  private _sourceHandles = new Handles<string>()
 
-  private _stopOnEntry: boolean;
+  private _stopOnEntry: boolean
 
   /**
    * Creates a new debug adapter that is used for one debug session.
    * We configure the default implementation of a debug adapter here.
    */
   public constructor() {
-    super();
+    super()
 
     // this debugger uses zero-based lines and columns
-    this.setDebuggerLinesStartAt1(false);
-    this.setDebuggerColumnsStartAt1(false);
+    this.setDebuggerLinesStartAt1(false)
+    this.setDebuggerColumnsStartAt1(false)
   }
 
   /**
@@ -278,234 +110,236 @@ export class LuaDebugSession extends DebugSession {
    */
   protected initializeRequest(
     response: DebugProtocol.InitializeResponse,
-    args: DebugProtocol.InitializeRequestArguments
+   // args: DebugProtocol.InitializeRequestArguments
   ): void {
     if (this._debug_server_process) {
-      this._debug_server_process.kill();
-      delete this._debug_server_process;
+      this._debug_server_process.kill()
+      delete this._debug_server_process
     }
     if (this._debug_client) {
-      this._debug_client.end();
-      delete this._debug_client;
+      this._debug_client.end()
+      delete this._debug_client
     }
     // This debug adapter implements the configurationDoneRequest.
-    response.body.supportsConfigurationDoneRequest = true;
+    response.body.supportsConfigurationDoneRequest = true
 
-    response.body.supportsConditionalBreakpoints = true;
+    response.body.supportsConditionalBreakpoints = true
 
-    response.body.supportsHitConditionalBreakpoints = true;
+    response.body.supportsHitConditionalBreakpoints = true
 
     // make VS Code to use 'evaluate' when hovering over source
-    response.body.supportsEvaluateForHovers = true;
+    response.body.supportsEvaluateForHovers = true
 
-    this.sendResponse(response);
+    this.sendResponse(response)
   }
 
   private setupSourceEnv(sourceRoot: string[]) {
     this.convertClientLineToDebugger = (line: number): number => {
-      return line;
-    };
+      return line
+    }
     this.convertDebuggerLineToClient = (line: number): number => {
-      return line;
-    };
+      return line
+    }
 
     this.convertClientPathToDebugger = (clientPath: string): string => {
       for (let index = 0; index < sourceRoot.length; index++) {
-        const root = sourceRoot[index];
-        const resolvedRoot = path.resolve(root);
-        const resolvedClient = path.resolve(clientPath);
+        const root = sourceRoot[index]
+        const resolvedRoot = path.resolve(root)
+        const resolvedClient = path.resolve(clientPath)
         if (resolvedClient.startsWith(resolvedRoot)) {
-          return path.relative(resolvedRoot, resolvedClient);
+          return path.relative(resolvedRoot, resolvedClient)
         }
       }
-      return path.relative(sourceRoot[0], clientPath);
-    };
+      return path.relative(sourceRoot[0], clientPath)
+    }
     this.convertDebuggerPathToClient = (debuggerPath: string): string => {
-      if (!debuggerPath.startsWith("@")) {
-        return "";
+      if (!debuggerPath.startsWith('@')) {
+        return ''
       }
-      const filename: string = debuggerPath.substr(1);
+      const filename: string = debuggerPath.substr(1)
       if (path.isAbsolute(filename)) {
-        return filename;
+        return filename
       } else {
         if (sourceRoot.length > 1) {
           for (let index = 0; index < sourceRoot.length; index++) {
-            const absolutePath = path.join(sourceRoot[index], filename);
+            const absolutePath = path.join(sourceRoot[index], filename)
             if (existsSync(absolutePath)) {
-              return absolutePath;
+              return absolutePath
             }
           }
         }
-        return path.join(sourceRoot[0], filename);
+        return path.join(sourceRoot[0], filename)
       }
-    };
+    }
   }
 
   protected launchRequest(
     response: DebugProtocol.LaunchResponse,
     args: LaunchRequestArguments
   ): void {
-    this._stopOnEntry = args.stopOnEntry;
-    const cwd = args.cwd ? args.cwd : process.cwd();
-    let sourceRoot = args.sourceRoot ? args.sourceRoot : cwd;
+    this._stopOnEntry = args.stopOnEntry
+    const cwd = args.cwd ? args.cwd : process.cwd()
+    let sourceRoot = args.sourceRoot ? args.sourceRoot : cwd
 
-    if (typeof sourceRoot === "string") {
-      sourceRoot = [sourceRoot];
+    if (typeof sourceRoot === 'string') {
+      sourceRoot = [sourceRoot]
     }
 
-    this.setupSourceEnv(sourceRoot);
-    const programArg = args.args ? args.args : [];
+    this.setupSourceEnv(sourceRoot)
+    const programArg = args.args ? args.args : []
 
-    const port = args.port ? args.port : 21110;
+    const port = args.port ? args.port : 21110
 
     const useInternalLua =
       args.useInternalLua != null
         ? args.useInternalLua
-        : args.program.endsWith(".lua");
+        : args.program.endsWith('.lua')
 
     if (useInternalLua) {
-      const program = this.convertClientPathToDebugger(args.program);
-      this._debug_server_process = LuaWasm.run(program,programArg, {
+      const program = this.convertClientPathToDebugger(args.program)
+      this._debug_server_process = LuaWasm.run(program, programArg, {
         cwd: cwd,
         silent: true,
       })
-      this._debug_client = new LRDBChildProcessClient(
-        this._debug_server_process
-      );
+      this._debug_client = new LRDBClient.Client(
+        new LRDBAdapter.ChildProcessAdapter(this._debug_server_process)
+      )
     } else {
       this._debug_server_process = spawn(args.program, programArg, {
         cwd: cwd,
-      });
-
-      this._debug_client = new LRDBTCPClient(port, "localhost");
+      })
+      this._debug_client = new LRDBClient.Client(
+        new LRDBAdapter.TcpAdapter(port, 'localhost')
+      )
     }
 
-    this._debug_client.on_event = (event: DebugServerEvent) => {
-      this.handleServerEvents(event);
-    };
-///    this._debug_client.on_close = () => {};
-//    this._debug_client.on_error = (e: any) => {};
+    this._debug_client.onNotify.on((event) => {
+      this.handleServerEvents(event)
+    })
+    ///    this._debug_client.on_close = () => {};
+    //    this._debug_client.on_error = (e: any) => {};
 
-    this._debug_client.on_open = () => {
-      this.sendEvent(new InitializedEvent());
-    };
+    this._debug_client.onOpen.on(() => {
+      this.sendEvent(new InitializedEvent())
+    })
 
-    this._debug_server_process.stdout.on("data", (data) => {
-      this.sendEvent(new OutputEvent(data.toString(), "stdout"));
-    });
-    this._debug_server_process.stderr.on("data", (data) => {
-      this.sendEvent(new OutputEvent(data.toString(), "stderr"));
-    });
-    this._debug_server_process.on("error", (msg: string) => {
-      this.sendEvent(new OutputEvent(msg, "error"));
-    });
-    this._debug_server_process.on("close", (code: number) => {
-      this.sendEvent(new OutputEvent(`exit status: ${code}\n`));
-      this.sendEvent(new TerminatedEvent());
-    });
+    this._debug_server_process.stdout.on('data', (data) => {
+      this.sendEvent(new OutputEvent(data.toString(), 'stdout'))
+    })
+    this._debug_server_process.stderr.on('data', (data) => {
+      this.sendEvent(new OutputEvent(data.toString(), 'stderr'))
+    })
+    this._debug_server_process.on('error', (msg: string) => {
+      this.sendEvent(new OutputEvent(msg, 'error'))
+    })
+    this._debug_server_process.on('close', (code: number) => {
+      this.sendEvent(new OutputEvent(`exit status: ${code}\n`))
+      this.sendEvent(new TerminatedEvent())
+    })
 
-    this.sendResponse(response);
+    this.sendResponse(response)
   }
 
   protected attachRequest(
     response: DebugProtocol.AttachResponse,
     oargs: DebugProtocol.AttachRequestArguments
   ): void {
-    const args = oargs as AttachRequestArguments;
-    this._stopOnEntry = args.stopOnEntry;
-    let sourceRoot = args.sourceRoot;
+    const args = oargs as AttachRequestArguments
+    this._stopOnEntry = args.stopOnEntry
+    let sourceRoot = args.sourceRoot
 
-    if (typeof sourceRoot === "string") {
-      sourceRoot = [sourceRoot];
+    if (typeof sourceRoot === 'string') {
+      sourceRoot = [sourceRoot]
     }
 
-    this.setupSourceEnv(sourceRoot);
+    this.setupSourceEnv(sourceRoot)
 
-    this._debug_client = new LRDBTCPClient(args.port, args.host);
-    this._debug_client.on_event = (event: DebugServerEvent) => {
-      this.handleServerEvents(event);
-    };
-    this._debug_client.on_close = () => {
-      this.sendEvent(new TerminatedEvent());
-    };
-//    this._debug_client.on_error = (e: any) => {};
+    this._debug_client = new LRDBClient.Client(
+      new LRDBAdapter.TcpAdapter(args.port, args.host)
+    )
 
-    this._debug_client.on_open = () => {
-      this.sendEvent(new InitializedEvent());
-    };
-    this.sendResponse(response);
+    this._debug_client.onNotify.on((event) => {
+      this.handleServerEvents(event)
+    })
+    this._debug_client.onClose.on(() => {
+      this.sendEvent(new TerminatedEvent())
+    })
+    this._debug_client.onOpen.on(() => {
+      this.sendEvent(new InitializedEvent())
+    })
+    this.sendResponse(response)
   }
 
   protected configurationDoneRequest(
     response: DebugProtocol.ConfigurationDoneResponse
   ): void {
-    this.sendResponse(response);
+    this.sendResponse(response)
   }
 
   protected setBreakPointsRequest(
     response: DebugProtocol.SetBreakpointsResponse,
     args: DebugProtocol.SetBreakpointsArguments
   ): void {
-    const path = args.source.path;
+    const path = args.source.path
 
     // read file contents into array for direct access
-    const lines = readFileSync(path).toString().split("\n");
+    const lines = readFileSync(path).toString().split('\n')
 
-    const breakpoints = new Array<Breakpoint>();
+    const breakpoints = new Array<Breakpoint>()
 
-    const debuggerFilePath = this.convertClientPathToDebugger(path);
+    const debuggerFilePath = this.convertClientPathToDebugger(path)
 
-    this._debug_client.send("clear_breakpoints", { file: debuggerFilePath });
+    this._debug_client.clearBreakPoints({ file: debuggerFilePath })
     // verify breakpoint locations
     for (const souceBreakpoint of args.breakpoints) {
-      let l = this.convertClientLineToDebugger(souceBreakpoint.line);
-      let verified = false;
+      let l = this.convertClientLineToDebugger(souceBreakpoint.line)
+      let verified = false
       while (l <= lines.length) {
-        const line = lines[l - 1].trim();
+        const line = lines[l - 1].trim()
         // if a line is empty or starts with '--' we don't allow to set a breakpoint but move the breakpoint down
-        if (line.length == 0 || line.startsWith("--")) {
-          l++;
+        if (line.length == 0 || line.startsWith('--')) {
+          l++
         } else {
-          verified = true; // this breakpoint has been validated
-          break;
+          verified = true // this breakpoint has been validated
+          break
         }
       }
       const bp = <DebugProtocol.Breakpoint>(
         new Breakpoint(verified, this.convertDebuggerLineToClient(l))
-      );
-      bp.id = this._breakPointID++;
-      breakpoints.push(bp);
+      )
+      bp.id = this._breakPointID++
+      breakpoints.push(bp)
       if (verified) {
         const sendbreakpoint = {
           line: l,
           file: debuggerFilePath,
           condition: undefined,
           hit_condition: undefined,
-        };
+        }
         if (souceBreakpoint.condition) {
-          sendbreakpoint.condition = souceBreakpoint.condition;
+          sendbreakpoint.condition = souceBreakpoint.condition
         }
         if (souceBreakpoint.hitCondition) {
-          sendbreakpoint.hit_condition = souceBreakpoint.hitCondition;
+          sendbreakpoint.hit_condition = souceBreakpoint.hitCondition
         }
-        this._debug_client.send("add_breakpoint", sendbreakpoint);
+        this._debug_client.addBreakPoint(sendbreakpoint)
       }
     }
-    this._breakPoints.set(path, breakpoints);
+    this._breakPoints.set(path, breakpoints)
 
     // send back the actual breakpoint positions
     response.body = {
       breakpoints: breakpoints,
-    };
-    this.sendResponse(response);
+    }
+    this.sendResponse(response)
   }
 
   protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
     // return the default thread
     response.body = {
-      threads: [new Thread(LuaDebugSession.THREAD_ID, "thread 1")],
-    };
-    this.sendResponse(response);
+      threads: [new Thread(LuaDebugSession.THREAD_ID, 'thread 1')],
+    }
+    this.sendResponse(response)
   }
 
   /**
@@ -515,22 +349,22 @@ export class LuaDebugSession extends DebugSession {
     response: DebugProtocol.StackTraceResponse,
     args: DebugProtocol.StackTraceArguments
   ): void {
-    this._debug_client.send("get_stacktrace", null, (res: any) => {
+    this._debug_client.getStackTrace().then((res) => {
       if (res.result) {
         const startFrame =
-          typeof args.startFrame === "number" ? args.startFrame : 0;
+          typeof args.startFrame === 'number' ? args.startFrame : 0
         const maxLevels =
-          typeof args.levels === "number"
+          typeof args.levels === 'number'
             ? args.levels
-            : res.result.length - startFrame;
-        const endFrame = Math.min(startFrame + maxLevels, res.result.length);
-        const frames = new Array<StackFrame>();
+            : res.result.length - startFrame
+        const endFrame = Math.min(startFrame + maxLevels, res.result.length)
+        const frames = new Array<StackFrame>()
         for (let i = startFrame; i < endFrame; i++) {
-          const frame = res.result[i]; // use a word of the line as the stackframe name
-          const filename = this.convertDebuggerPathToClient(frame.file);
-          const source = new Source(frame.id, filename);
-          if (!frame.file.startsWith("@")) {
-            source.sourceReference = this._sourceHandles.create(frame.file);
+          const frame = res.result[i] // use a word of the line as the stackframe name
+          const filename = this.convertDebuggerPathToClient(frame.file)
+          const source = new Source(frame.id, filename)
+          if (!frame.file.startsWith('@')) {
+            source.sourceReference = this._sourceHandles.create(frame.file)
           }
           frames.push(
             new StackFrame(
@@ -540,265 +374,234 @@ export class LuaDebugSession extends DebugSession {
               this.convertDebuggerLineToClient(frame.line),
               0
             )
-          );
+          )
         }
         response.body = {
           stackFrames: frames,
           totalFrames: res.result.length,
-        };
+        }
       } else {
-        response.success = false;
-        response.message = "unknown error";
+        response.success = false
+        response.message = 'unknown error'
       }
-      this.sendResponse(response);
-    });
+      this.sendResponse(response)
+    })
   }
 
   protected scopesRequest(
     response: DebugProtocol.ScopesResponse,
     args: DebugProtocol.ScopesArguments
   ): void {
-    const scopes = new Array<Scope>();
-    scopes.push(
+    const scopes = [
       new Scope(
-        "Local",
-        this._variableHandles.create(
-          new VariableReference(
-            "get_local_variable",
-            {
-              stack_no: args.frameId,
-              global: false,
-              local: true,
-              upvalue: false,
-            },
-            []
-          )
-        ),
+        'Local',
+        this._variableHandles.create({
+          type: 'get_local_variable',
+          params: {
+            stack_no: args.frameId,
+          },
+        }),
         false
-      )
-    );
-    scopes.push(
+      ),
       new Scope(
-        "Upvalues",
-        this._variableHandles.create(
-          new VariableReference(
-            "get_upvalues",
-            {
-              stack_no: args.frameId,
-              global: false,
-              local: false,
-              upvalue: true,
-            },
-            []
-          )
-        ),
+        'Upvalues',
+        this._variableHandles.create({
+          type: 'get_upvalues',
+          params: {
+            stack_no: args.frameId,
+          },
+        }),
         false
-      )
-    );
-    scopes.push(
+      ),
       new Scope(
-        "Global",
-        this._variableHandles.create(
-          new VariableReference(
-            "get_global",
-            {
-              stack_no: args.frameId,
-              global: true,
-              local: false,
-              upvalue: false,
-            },
-            []
-          )
-        ),
+        'Global',
+        this._variableHandles.create({
+          type: 'get_global',
+          params: {},
+        }),
         true
-      )
-    );
+      ),
+    ]
 
     response.body = {
       scopes: scopes,
-    };
-    this.sendResponse(response);
-  }
-
-  private createVariableObjectPath(datapath: string[]): string {
-    if (datapath.length == 1) {
-      return datapath[0];
-    } else {
-      return "(" + datapath[0] + ")[" + datapath.slice(1).join("][") + "]";
     }
+    this.sendResponse(response)
   }
 
   protected variablesRequest(
     response: DebugProtocol.VariablesResponse,
     args: DebugProtocol.VariablesArguments
   ): void {
-    const id = this._variableHandles.get(args.variablesReference);
+    const parent = this._variableHandles.get(args.variablesReference)
 
-    if (id != null) {
-      if (id.datapath.length == 0) {
-        this._debug_client.send(
-          id.msg_name,
-          Object.assign({}, id.msg_param),
-          (res: any) => {
-            if (res.error) {
-              response.success = false;
-              response.message = res.error.message;
-              this.sendResponse(response);
-            } else {
-              this.variablesRequestResponce(response, res.result, id);
-            }
-          }
-        );
-      } else {
-        const chunk = this.createVariableObjectPath(id.datapath);
-        this._debug_client.send(
-          id.msg_name,
-          Object.assign({ chunk: chunk }, id.msg_param),
-          (res: any) => {
-            if (res.error) {
-              response.success = false;
-              response.message = res.error.message;
-              this.sendResponse(response);
-            } else {
-              this.variablesRequestResponce(response, res.result[0], id);
-            }
-          }
-        );
-      }
+    if (parent != null) {
+      const res = (() => {
+        switch (parent.type) {
+          case 'get_global':
+            return this._debug_client
+              .getGlobal(parent.params)
+              .then((res) => res.result)
+          case 'get_local_variable':
+            return this._debug_client
+              .getLocalVariable(parent.params)
+              .then((res) => res.result)
+          case 'get_upvalues':
+            return this._debug_client
+              .getUpvalues(parent.params)
+              .then((res) => res.result)
+          case 'eval':
+            return this._debug_client
+              .eval(parent.params)
+              .then((res) => res.result[0])
+          default:
+            return Promise.reject(Error('invalid'))
+        }
+      })()
+
+      res
+        .then((result) =>
+          this.variablesRequestResponce(response, result, parent)
+        )
+        .catch((err) => {
+          response.success = false
+          response.message = err.message
+          this.sendResponse(response)
+        })
     } else {
-      response.success = false;
-      this.sendResponse(response);
-    }
-  }
-  protected stringify(value: unknown): string {
-    if (value == null) {
-      return "nil";
-    } else if (value == undefined) {
-      return "none";
-    } else {
-      return JSON.stringify(value);
+      response.success = false
+      this.sendResponse(response)
     }
   }
 
   private variablesRequestResponce(
     response: DebugProtocol.VariablesResponse,
-    variablesData: any,
-    id: VariableReference
+    variablesData: unknown,
+    parent: VariableReference
   ): void {
-    const variables = [];
-    if (variablesData instanceof Array) {
-      for (let i = 0; i < variablesData.length; ++i) {
-        const typename = typeof variablesData[i];
-        const k = (i + 1).toString();
-        let varRef = 0;
-        if (typename == "object") {
-          varRef = this._variableHandles.create(
-            new VariableReference("eval", id.msg_param, id.datapath.concat([k]))
-          );
-        }
-        variables.push({
-          name: k,
-          type: typename,
-          value: this.stringify(variablesData[i]),
-          variablesReference: varRef,
-        });
-      }
-    } else {
-      for (const k in variablesData) {
-        const typename = typeof variablesData[k];
-        let varRef = 0;
-        if (typename == "object") {
-          let datakey = k;
-          if (id.datapath.length) {
-            datakey = '"' + k + '"';
+    const evalParam = (k: string | number): EvalParam => {
+      switch (parent.type) {
+        case 'eval': {
+          const key = typeof k === 'string' ? `"${k}"` : `${k}`
+          return {
+            type: 'eval',
+            params: {
+              ...parent.params,
+              chunk: `(${parent.params.chunk})[${key}]`,
+            },
           }
-          varRef = this._variableHandles.create(
-            new VariableReference(
-              "eval",
-              id.msg_param,
-              id.datapath.concat([datakey])
-            )
-          );
         }
+        default: {
+          return {
+            type: 'eval',
+            params: {
+              stack_no: 0,
+              ...parent.params,
+              chunk: `${k}`,
+              upvalue: parent.type === 'get_upvalues',
+              local: parent.type === 'get_local_variable',
+              global: parent.type === 'get_global',
+            },
+          }
+        }
+      }
+    }
+    const variables: DebugProtocol.Variable[] = []
+    if (variablesData instanceof Array) {
+      variablesData.forEach((v,i) => {
+        const typename = typeof v
+        const k = i + 1
+        const varRef = (typename == 'object') ? this._variableHandles.create(evalParam(k)) : undefined
+        variables.push({
+          name: `${k}`,
+          type: typename,
+          value: stringify(v),
+          variablesReference: varRef,
+        })
+      })
+    } else if (typeof variablesData === 'object') {
+      for (const k in variablesData) {
+        const typename = typeof variablesData[k]
+        const varRef =  (typename == 'object') ? this._variableHandles.create(evalParam(k)) : undefined
         variables.push({
           name: k,
           type: typename,
-          value: this.stringify(variablesData[k]),
+          value: stringify(variablesData[k]),
           variablesReference: varRef,
-        });
+        })
       }
     }
     response.body = {
       variables: variables,
-    };
-    this.sendResponse(response);
+    }
+    this.sendResponse(response)
   }
 
   protected continueRequest(
     response: DebugProtocol.ContinueResponse,
-    args: DebugProtocol.ContinueArguments
+ //   args: DebugProtocol.ContinueArguments
   ): void {
-    this._debug_client.send("continue");
-    this.sendResponse(response);
+    this._debug_client.continue()
+    this.sendResponse(response)
   }
 
   protected nextRequest(
     response: DebugProtocol.NextResponse,
-    args: DebugProtocol.NextArguments
+ //   args: DebugProtocol.NextArguments
   ): void {
-    this._debug_client.send("step");
-    this.sendResponse(response);
+    this._debug_client.step()
+    this.sendResponse(response)
   }
 
   protected stepInRequest(
     response: DebugProtocol.StepInResponse,
-    args: DebugProtocol.StepInArguments
+  //  args: DebugProtocol.StepInArguments
   ): void {
-    this._debug_client.send("step_in");
-    this.sendResponse(response);
+    this._debug_client.stepIn()
+    this.sendResponse(response)
   }
 
   protected stepOutRequest(
     response: DebugProtocol.StepOutResponse,
-    args: DebugProtocol.StepOutArguments
+   // args: DebugProtocol.StepOutArguments
   ): void {
-    this._debug_client.send("step_out");
-    this.sendResponse(response);
+    this._debug_client.stepOut()
+    this.sendResponse(response)
   }
   protected pauseRequest(
     response: DebugProtocol.PauseResponse,
-    args: DebugProtocol.PauseArguments
+  //  args: DebugProtocol.PauseArguments
   ): void {
-    this._debug_client.send("pause");
-    this.sendResponse(response);
+    this._debug_client.pause()
+    this.sendResponse(response)
   }
 
   protected sourceRequest(
     response: DebugProtocol.SourceResponse,
     args: DebugProtocol.SourceArguments
   ): void {
-    const id = this._sourceHandles.get(args.sourceReference);
+    const id = this._sourceHandles.get(args.sourceReference)
     if (id) {
       response.body = {
         content: id,
-      };
+      }
     }
-    this.sendResponse(response);
+    this.sendResponse(response)
   }
 
   protected disconnectRequest(
     response: DebugProtocol.DisconnectResponse,
-    args: DebugProtocol.DisconnectArguments
+  //  args: DebugProtocol.DisconnectArguments
   ): void {
     if (this._debug_server_process) {
-      this._debug_server_process.kill();
-      delete this._debug_server_process;
+      this._debug_server_process.kill()
+      delete this._debug_server_process
     }
     if (this._debug_client) {
-      this._debug_client.end();
-      delete this._debug_client;
+      this._debug_client.end()
+      delete this._debug_client
     }
-    this.sendResponse(response);
+    this.sendResponse(response)
   }
 
   protected evaluateRequest(
@@ -806,73 +609,55 @@ export class LuaDebugSession extends DebugSession {
     args: DebugProtocol.EvaluateArguments
   ): void {
     if (!this._debug_client) {
-      response.success = false;
-      this.sendResponse(response);
-      return;
+      response.success = false
+      this.sendResponse(response)
+      return
     }
     //		if (args.context == "watch" || args.context == "hover" || args.context == "repl") {
-    const chunk = args.expression;
-    this._debug_client.send(
-      "eval",
-      { stack_no: args.frameId, chunk: chunk, depth: 0 },
-      (res: any) => {
-        if (res.result) {
-          let ret = "";
-          for (const r of res.result) {
-            if (ret.length > 0) ret += "	";
-            ret += this.stringify(r);
+    const chunk = args.expression
+    const requestParam = { stack_no: args.frameId, chunk: chunk, depth: 0 }
+    this._debug_client.eval(requestParam).then((res) => {
+      if (res.result instanceof Array) {
+        const ret = res.result.map(v => stringify(v)).join('	')
+        let varRef = 0
+        if (res.result.length == 1) {
+          const refobj = res.result[0]
+          const typename = typeof refobj
+          if (refobj && typename == 'object') {
+            varRef = this._variableHandles.create({
+              type: 'eval',
+              params: requestParam,
+            })
           }
-          let varRef = 0;
-          if (res.result.length == 1) {
-            const refobj = res.result[0];
-            const typename = typeof refobj;
-            if (refobj && typename == "object") {
-              varRef = this._variableHandles.create(
-                new VariableReference("eval", { stack_no: args.frameId }, [
-                  chunk,
-                ])
-              );
-            }
-          }
-          response.body = {
-            result: ret,
-            variablesReference: varRef,
-          };
-        } else {
-          response.body = {
-            result: "",
-            variablesReference: 0,
-          };
-          response.success = false;
         }
-        this.sendResponse(response);
+        response.body = {
+          result: ret,
+          variablesReference: varRef,
+        }
+      } else {
+        response.body = {
+          result: '',
+          variablesReference: 0,
+        }
+        response.success = false
       }
-    );
-    /*	}
-			else {
-
-				response.body = {
-					result: `evaluate(context: '${args.context}', '${args.expression}')`,
-					variablesReference: 0
-				};
-				this.sendResponse(response);
-			}*/
+      this.sendResponse(response)
+    })
   }
 
-  private handleServerEvents(event: DebugServerEvent) {
-    if (event.method == "paused") {
-      if (event.params.reason === "entry" && !this._stopOnEntry) {
-        this._debug_client.send("continue");
-      }
-      else {
+  private handleServerEvents(event: LRDBClient.DebuggerNotify) {
+    if (event.method == 'paused') {
+      if (event.params.reason === 'entry' && !this._stopOnEntry) {
+        this._debug_client.continue()
+      } else {
         this.sendEvent(
           new StoppedEvent(event.params.reason, LuaDebugSession.THREAD_ID)
-        );
+        )
       }
-    } else if (event.method == "running") {
-      this._variableHandles.reset();
-      this.sendEvent(new ContinuedEvent(LuaDebugSession.THREAD_ID));
-    } else if (event.method == "exit") {
+    } else if (event.method == 'running') {
+      this._variableHandles.reset()
+      this.sendEvent(new ContinuedEvent(LuaDebugSession.THREAD_ID))
+    } else if (event.method == 'exit') {
       // non
     }
   }

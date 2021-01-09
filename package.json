@@ -11,7 +11,7 @@
     "Debuggers"
   ],
   "dependencies": {
-    "lrdb-debuggable-lua": "^0.5.3",
+    "lrdb-debuggable-lua": "^0.5.4",
     "vscode-debugadapter": "^1.43.0",
     "vscode-nls": "^2.0.2"
   },

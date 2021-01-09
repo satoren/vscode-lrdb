@@ -88,25 +88,25 @@ describe('Lua Debug Adapter', () => {
     test('should run program to the end', async () => {
       const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua')
 
-      const response = await Promise.all([
+      const response = Promise.all([
         dc.launch({ program: PROGRAM }),
         dc.configurationSequence(),
         dc.waitForEvent('terminated'),
       ])
 
-      expect(response).toMatchSnapshot()
+      await expect(response).resolves.toHaveLength(3)
     })
 
     test('should stop on entry', async () => {
       const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua')
       const ENTRY_LINE = 1
-      const response = await Promise.all([
+      const response = Promise.all([
         dc.launch({ program: PROGRAM, stopOnEntry: true }),
         dc.configurationSequence(),
         dc.waitForEvent('stopped'),
         dc.assertStoppedLocation('entry', { line: ENTRY_LINE }),
       ])
-      expect(response).toMatchSnapshot()
+      await expect(response).resolves.toHaveLength(4)
     })
   })
 
@@ -114,11 +114,11 @@ describe('Lua Debug Adapter', () => {
     test('should stop on breakpoint', async () => {
       const PROGRAM = path.join(DATA_ROOT, 'loop_test.lua')
       const BREAK_LINE = 5
-      const response = await dc.hitBreakpoint(
+      const response = dc.hitBreakpoint(
         { program: PROGRAM },
         { path: PROGRAM, line: BREAK_LINE }
       )
-      expect(response).toMatchSnapshot()
+      await expect(response).resolves.toHaveLength(3)
     })
   })
   describe('evaluate', () => {
@@ -131,7 +131,7 @@ describe('Lua Debug Adapter', () => {
       ])
     })
     test('check watch results 1', async () => {
-      const response = await dc
+      const response = dc
         .evaluateRequest({
           expression: '{{1}}',
           context: 'watch',
@@ -143,11 +143,11 @@ describe('Lua Debug Adapter', () => {
             '1',
           ])
         )
-      expect(response.value).toBe('1')
+      await expect(response).resolves.toMatchObject({ name: '1', value: '1' })
     })
 
     test('watch array value [1][1]', async () => {
-      const response = await dc
+      const response = dc
         .evaluateRequest({
           expression: '{{1}}',
           context: 'watch',
@@ -159,11 +159,11 @@ describe('Lua Debug Adapter', () => {
             '1',
           ])
         )
-      expect(response.value).toBe('1')
+      await expect(response).resolves.toMatchObject({ name: '1', value: '1' })
     })
 
     test('watch array value [1][1][3]', async () => {
-      const response = await dc
+      const response = dc
         .evaluateRequest({
           expression: '{{{5,4}}}',
           context: 'watch',
@@ -176,10 +176,10 @@ describe('Lua Debug Adapter', () => {
             ['1', '1', '2']
           )
         })
-      expect(response.value).toBe('4')
+      await expect(response).resolves.toMatchObject({ name: '2', value: '4' })
     })
     test('watch object value ["a"][2]', async () => {
-      const response = await dc
+      const response = dc
         .evaluateRequest({
           expression: '{a={4,2}}',
           context: 'watch',
@@ -192,7 +192,7 @@ describe('Lua Debug Adapter', () => {
             ['a', '2']
           )
         })
-      expect(response.value).toBe('2')
+      await expect(response).resolves.toMatchObject({ name: '2', value: '2' })
     })
   })
 
@@ -215,15 +215,24 @@ describe('Lua Debug Adapter', () => {
         throw Error('upvalue not found')
       })
     }
+    test('check upvalues', async () => {
+      return dc
+        .scopesRequest({ frameId: 0 })
+        .then((res) =>
+          res.body.scopes.find((scope) => scope.name === 'Upvalues')
+        )
+        .then((ref) => dc.variablesRequest(ref))
+        .then((res) => expect(res.body.variables[0]).toMatchSnapshot())
+    })
     test('check upvalue a', async () => {
-      const response = await getUpvalueScope(0).then((scope) => {
+      const response = getUpvalueScope(0).then((scope) => {
         return sequenceVariablesRequest(dc, scope.variablesReference, ['a'])
       })
-      expect(response.value).toBe('1')
+      await expect(response).resolves.toMatchObject({ name: 'a', value: '1' })
     })
     test('check upvalue table ["t"][1][1]', async () => {
       //local t={{1,2,3,4},5,6}
-      const response = await getUpvalueScope(0).then((scope) => {
+      const response = getUpvalueScope(0).then((scope) => {
         return sequenceVariablesRequest(dc, scope.variablesReference, [
           't',
           '1',
@@ -231,27 +240,51 @@ describe('Lua Debug Adapter', () => {
         ])
       })
 
-      expect(response.value).toBe('1')
+      await expect(response).resolves.toMatchObject({ name: '1', value: '1' })
     })
 
     test('check upvalue table ["t"][1][3]', async () => {
-      const response = await getUpvalueScope(0).then((scope) => {
+      const response = getUpvalueScope(0).then((scope) => {
         return sequenceVariablesRequest(dc, scope.variablesReference, [
           't',
           '1',
           '3',
         ])
       })
-      expect(response.value).toBe('3')
+      await expect(response).resolves.toMatchObject({ name: '3', value: '3' })
     })
     test('check upvalue table ["t"][2]', async () => {
-      const response = await getUpvalueScope(0).then((scope) => {
+      const response = getUpvalueScope(0).then((scope) => {
         return sequenceVariablesRequest(dc, scope.variablesReference, [
           't',
           '2',
         ])
       })
-      expect(response.value).toBe('5')
+      await expect(response).resolves.toMatchObject({ name: '2', value: '5' })
+    })
+  })
+
+  describe('global', () => {
+    beforeEach(() => {
+      const PROGRAM = path.join(DATA_ROOT, 'get_global_variable_test.lua')
+      const BREAK_LINE = 7
+      return dc.hitBreakpoint(
+        { program: PROGRAM, stopOnEntry: false },
+        { path: PROGRAM, line: BREAK_LINE }
+      )
+    })
+    test('check global values',  () => {
+      return dc
+        .scopesRequest({ frameId: 0 })
+        .then((res) => res.body.scopes.find((scope) => scope.name === 'Global'))
+        .then((ref) => dc.variablesRequest(ref))
+        .then(((value) =>
+              expect(value.body.variables).toContainEqual({
+              name: '_VERSION',
+              type: 'string',
+              value: '"Lua 5.3"',
+            })
+        ))
     })
   })
 
@@ -275,6 +308,13 @@ describe('Lua Debug Adapter', () => {
       })
     }
 
+    test('check local_values', async () => {
+      return dc
+        .scopesRequest({ frameId: 0 })
+        .then((res) => res.body.scopes.find((scope) => scope.name === 'Local'))
+        .then((ref) => dc.variablesRequest(ref))
+        .then((res) => expect(res).toMatchSnapshot())
+    })
     test('get local_value1', async () => {
       const response = await getLocalScope(0).then((scope) => {
         return sequenceVariablesRequest(dc, scope.variablesReference, [
