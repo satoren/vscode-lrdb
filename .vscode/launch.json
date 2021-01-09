@@ -39,13 +39,8 @@
 			"request": "launch",
 			"name": "Debug adapter tests",
 			"cwd": "${workspaceRoot}",
-			"program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
-			"args": [
-				"-u", "tdd",
-				"--timeout", "999999",
-				"--colors",
-				"./out/test/"
-			],
+			"program": "${workspaceRoot}/node_modules/jest/bin/jest.js",
+			"args": ["--runInBand"],
 			"sourceMaps": true,
 			"outFiles": [ "${workspaceRoot}/out/test/**/*.js" ],
 			"internalConsoleOptions": "openOnSessionStart",

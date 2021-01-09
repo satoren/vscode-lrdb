@@ -46,7 +46,7 @@ Array [
     },
     "command": "stackTrace",
     "request_seq": 5,
-    "seq": 11,
+    "seq": 8,
     "success": true,
     "type": "response",
   },
@@ -71,7 +71,7 @@ Array [
   },
   Object {
     "event": "terminated",
-    "seq": 10,
+    "seq": 7,
     "type": "event",
   },
 ]
@@ -121,7 +121,7 @@ Array [
     },
     "command": "stackTrace",
     "request_seq": 4,
-    "seq": 9,
+    "seq": 6,
     "success": true,
     "type": "response",
   },

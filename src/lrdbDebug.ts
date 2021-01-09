@@ -17,6 +17,7 @@ import { readFileSync, existsSync } from "fs";
 import { fork, spawn, ChildProcess } from "child_process";
 import * as net from "net";
 import * as path from "path";
+import { LuaWasm } from 'lrdb-debuggable-lua'
 
 export interface LaunchRequestArguments
   extends DebugProtocol.LaunchRequestArguments {
@@ -363,15 +364,11 @@ export class LuaDebugSession extends DebugSession {
         : args.program.endsWith(".lua");
 
     if (useInternalLua) {
-      const vm = path.resolve(
-        path.join(__dirname, "../prebuilt/lua_with_lrdb_server.js")
-      );
       const program = this.convertClientPathToDebugger(args.program);
-      this._debug_server_process = fork(vm, [program].concat(programArg), {
+      this._debug_server_process = LuaWasm.run(program,programArg, {
         cwd: cwd,
         silent: true,
-      });
-
+      })
       this._debug_client = new LRDBChildProcessClient(
         this._debug_server_process
       );
@@ -393,16 +390,16 @@ export class LuaDebugSession extends DebugSession {
       this.sendEvent(new InitializedEvent());
     };
 
-    this._debug_server_process.stdout.on("data", (data: any) => {
+    this._debug_server_process.stdout.on("data", (data) => {
       this.sendEvent(new OutputEvent(data.toString(), "stdout"));
     });
-    this._debug_server_process.stderr.on("data", (data: any) => {
+    this._debug_server_process.stderr.on("data", (data) => {
       this.sendEvent(new OutputEvent(data.toString(), "stderr"));
     });
     this._debug_server_process.on("error", (msg: string) => {
       this.sendEvent(new OutputEvent(msg, "error"));
     });
-    this._debug_server_process.on("close", (code: number, signal: string) => {
+    this._debug_server_process.on("close", (code: number) => {
       this.sendEvent(new OutputEvent(`exit status: ${code}\n`));
       this.sendEvent(new TerminatedEvent());
     });
@@ -443,11 +440,6 @@ export class LuaDebugSession extends DebugSession {
     response: DebugProtocol.ConfigurationDoneResponse
   ): void {
     this.sendResponse(response);
-    if (this._stopOnEntry) {
-      this.sendEvent(new StoppedEvent("entry", LuaDebugSession.THREAD_ID));
-    } else {
-      this._debug_client.send("continue");
-    }
   }
 
   protected setBreakPointsRequest(
@@ -678,7 +670,7 @@ export class LuaDebugSession extends DebugSession {
       this.sendResponse(response);
     }
   }
-  protected stringify(value: any): string {
+  protected stringify(value: unknown): string {
     if (value == null) {
       return "nil";
     } else if (value == undefined) {
@@ -868,10 +860,15 @@ export class LuaDebugSession extends DebugSession {
   }
 
   private handleServerEvents(event: DebugServerEvent) {
-    if (event.method == "paused" && event.params.reason != "entry") {
-      this.sendEvent(
-        new StoppedEvent(event.params.reason, LuaDebugSession.THREAD_ID)
-      );
+    if (event.method == "paused") {
+      if (event.params.reason === "entry" && !this._stopOnEntry) {
+        this._debug_client.send("continue");
+      }
+      else {
+        this.sendEvent(
+          new StoppedEvent(event.params.reason, LuaDebugSession.THREAD_ID)
+        );
+      }
     } else if (event.method == "running") {
       this._variableHandles.reset();
       this.sendEvent(new ContinuedEvent(LuaDebugSession.THREAD_ID));
