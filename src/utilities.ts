@@ -2,8 +2,8 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
-'use strict';
+'use strict'
 
-import * as nls from 'vscode-nls';
+import * as nls from 'vscode-nls'
 
-export const localize = nls.config(process.env.VSCODE_NLS_CONFIG)();
+export const localize = nls.config(process.env.VSCODE_NLS_CONFIG)()

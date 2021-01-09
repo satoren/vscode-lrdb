@@ -1,4 +1,3 @@
+import { LuaDebugSession } from './lrdbDebug'
 
- import { LuaDebugSession } from './lrdbDebug';
-
- LuaDebugSession.run(LuaDebugSession);
+LuaDebugSession.run(LuaDebugSession)
