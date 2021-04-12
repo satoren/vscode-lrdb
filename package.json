@@ -1,166 +1,187 @@
 {
-	"name": "lrdb",
-	"displayName": "LRDB",
-	"description": "Lua Remote DeBugger",
-	"version": "0.3.4",
-	"publisher": "satoren",
-	"engines": {
-		"vscode": "^1.17.0",
-		"node": "^7.4.0"
-	},
-	"categories": [
-		"Debuggers"
-	],
-	"dependencies": {
-		"vscode-debugadapter": "1.24.0",
-		"vscode-nls": "2.0.2"
-	},
-	"activationEvents": [
-		"onDebug"
-	],
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/satoren/vscode-lrdb.git"
-	},
-	"bugs": {
-		"url": "https://github.com/satoren/vscode-lrdb/issues"
-	},
-	"main": "./out/src/extension.js",
-	"scripts": {
-		"vscode:prepublish": "tsc -p ./",
-		"compile": "tsc -watch -p ./",
-		"postinstall": "node ./node_modules/vscode/bin/install",
-		"test": "node ./node_modules/mocha/bin/mocha -u tdd ./out/test/"
-	},
-	"devDependencies": {
-		"typescript": "2.5.2",
-		"vscode": "1.1.10",
-		"vscode-nls-dev": "2.1.5",
-		"vscode-debugadapter-testsupport": "^1.24.0",
-		"vscode-debugprotocol": "1.24.0",
-		"mocha": "3.5.0",
-		"@types/mocha": "2.2.42",
-		"@types/node": "6.0.52",
-		"vsce": "1.32.0"
-	},
-	"icon": "images/icon.png",
-	"license": "BSL-1.0",
-	"contributes": {
-		"breakpoints": [
-			{
-				"language": "lua"
-			}
-		],
-		"debuggers": [
-			{
-				"type": "lrdb",
-				"label": "Lua Debug",
-				"program": "./out/src/debugAdapter.js",
-				"runtime": "node",
-				"languages": [
-					"lua"
-				],
-				"variables": {},
-				"configurationSnippets": [
-					{
-						"label": "Lua: (lrdb) Launch",
-						"description": "A new configuration for launching a lua program",
-						"body": {
-							"type": "lrdb",
-							"request": "launch",
-							"name": "${2:Launch Program}",
-							"program": "Lua program file or Lua host executable.",
-							"args": [],
-							"cwd": "${workspaceFolder}"
-						}
-					},
-					{
-						"label": "Lua: (lrdb) Attach",
-						"description": "A new configuration for attaching a LRDB embeded program",
-						"body": {
-							"type": "lrdb",
-							"request": "attach",
-							"name": "${1:Attach}",
-							"host": "localhost",
-							"port": 21110,
-							"sourceRoot": "${workspaceFolder}"
-						}
-					}
-				],
-				"configurationAttributes": {
-					"launch": {
-						"required": [
-							"program"
-						],
-						"properties": {
-							"program": {
-								"type": "string",
-								"description": "Lua program file or Lua host program with embedded LRDB.",
-								"default": "${file}"
-							},
-							"cwd": {
-								"type": "string",
-								"description": "working directory.",
-								"default": "${workspaceFolder}"
-							},
-							"args": {
-								"type": "array",
-								"description": "Command line arguments.",
-								"default": []
-							},
-							"useInternalLua": {
-								"type": [
-									"boolean",
-									"null"
-								],
-								"description": "If true use internal(in this Extension) Lua interpreter, false direct execute `program`",
-								"default": null
-							},
-							"sourceRoot": {
-								"type": ["string", "array"],
-								"description": "script source root directory. to be used in souce file matching at breakpoints.",
-								"default": "${workspaceFolder}"
-							},
-							"stopOnEntry": {
-								"type": "boolean",
-								"description": "Automatically stop after launch.",
-								"default": true
-							}
-						}
-					},
-					"attach": {
-						"required": [
-							"host",
-							"port"
-						],
-						"properties": {
-							"host": {
-								"type": "string",
-								"description": "host name.",
-								"default": "localhost"
-							},
-							"port": {
-								"type": "number",
-								"description": "port",
-								"default": 21110
-							},
-							"sourceRoot": {
-								"type": [
-									"string",
-									"array"
-								],
-								"description": "script source root directory.",
-								"default": "${workspaceFolder}"
-							},
-							"stopOnEntry": {
-								"type": "boolean",
-								"description": "Automatically stop after launch.",
-								"default": true
-							}
-						}
-					}
-				}
-			}
-		]
-	}
+  "name": "lrdb",
+  "displayName": "LRDB",
+  "description": "Lua Remote DeBugger",
+  "version": "0.3.4",
+  "publisher": "satoren",
+  "engines": {
+    "vscode": "^1.49.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "dependencies": {
+    "lrdb-debuggable-lua": "^0.5.4",
+    "vscode-debugadapter": "^1.43.0",
+    "vscode-nls": "^2.0.2"
+  },
+  "activationEvents": [
+    "onDebug"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/satoren/vscode-lrdb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/satoren/vscode-lrdb/issues"
+  },
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "tsc -p ./",
+    "compile": "tsc -watch -p ./",
+    "package": "vsce package",
+    "publish": "vsce publish",
+    "build": "tsc",
+    "jest": "jest",
+    "test": "run-s build jest",
+    "lint:eslint": "eslint . --cache --ext ts",
+    "lint:prettier": "prettier . --check",
+    "lint": "run-s lint:eslint lint:prettier",
+    "fix": "run-s fix:eslint fix:prettier",
+    "fix:eslint": "yarn lint:eslint --fix",
+    "fix:prettier": "yarn lint:prettier --write"
+  },
+  "devDependencies": {
+    "@types/node": "^6.14.13",
+    "@types/vscode": "^1.52.0",
+    "@typescript-eslint/eslint-plugin": "^4.9.1",
+    "@typescript-eslint/parser": "^4.9.1",
+    "eslint": "^7.15.0",
+    "eslint-config-prettier": "^7.0.0",
+    "eslint-plugin-jest": "^24.1.3",
+    "jest": "^26.6.3",
+    "prettier": "^2.2.1",
+    "ts-jest": "^26.4.4",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.1.3",
+    "npm-run-all": "^4.1.5",
+    "vsce": "^1.83.0",
+    "vscode-debugadapter-testsupport": "^1.24.0",
+    "vscode-debugprotocol": "^1.43.0",
+    "vscode-nls-dev": "^2.1.6",
+    "vscode-test": "^1.4.1"
+  },
+  "icon": "images/icon.png",
+  "license": "BSL-1.0",
+  "contributes": {
+    "breakpoints": [
+      {
+        "language": "lua"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "lrdb",
+        "label": "Lua Debug",
+        "program": "./out/debugAdapter.js",
+        "runtime": "node",
+        "languages": [
+          "lua"
+        ],
+        "variables": {},
+        "configurationSnippets": [
+          {
+            "label": "Lua: (lrdb) Launch",
+            "description": "A new configuration for launching a lua program",
+            "body": {
+              "type": "lrdb",
+              "request": "launch",
+              "name": "${2:Launch Program}",
+              "program": "Lua program file or Lua host executable.",
+              "args": [],
+              "cwd": "${workspaceFolder}"
+            }
+          },
+          {
+            "label": "Lua: (lrdb) Attach",
+            "description": "A new configuration for attaching a LRDB embeded program",
+            "body": {
+              "type": "lrdb",
+              "request": "attach",
+              "name": "${1:Attach}",
+              "host": "localhost",
+              "port": 21110,
+              "sourceRoot": "${workspaceFolder}"
+            }
+          }
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Lua program file or Lua host program with embedded LRDB.",
+                "default": "${file}"
+              },
+              "cwd": {
+                "type": "string",
+                "description": "working directory.",
+                "default": "${workspaceFolder}"
+              },
+              "args": {
+                "type": "array",
+                "description": "Command line arguments.",
+                "default": []
+              },
+              "useInternalLua": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "If true use internal(in this Extension) Lua interpreter, false direct execute `program`",
+                "default": null
+              },
+              "sourceRoot": {
+                "type": [
+                  "string",
+                  "array"
+                ],
+                "description": "script source root directory. to be used in souce file matching at breakpoints.",
+                "default": "${workspaceFolder}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch.",
+                "default": true
+              }
+            }
+          },
+          "attach": {
+            "required": [
+              "host",
+              "port"
+            ],
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "host name.",
+                "default": "localhost"
+              },
+              "port": {
+                "type": "number",
+                "description": "port",
+                "default": 21110
+              },
+              "sourceRoot": {
+                "type": [
+                  "string",
+                  "array"
+                ],
+                "description": "script source root directory.",
+                "default": "${workspaceFolder}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch.",
+                "default": true
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
 }

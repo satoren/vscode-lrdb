@@ -8,22 +8,21 @@ This extension is debug Lua programs with Visual Studio Code.
 
 ## Features
 
-* Supports Windows,macOS,Linux
-* Add/remove break points
-* Conditional break points
-* Continue,Pause,Step over, Step in, Step out
-* Local,Global,_ENV,Upvalue variables and arguments
-* Watch window
-* Evaluate Expressions
-* Debug with embedded Lua interpreter(Lua 5.3.3 on Javascript by Emscripten)
-* Debug with Your host program([require embed debug server](https://github.com/satoren/LRDB))
-* Remote debugging over TCP
-
-
+-   Supports Windows,macOS,Linux
+-   Add/remove break points
+-   Conditional break points
+-   Continue,Pause,Step over, Step in, Step out
+-   Local,Global,\_ENV,Upvalue variables and arguments
+-   Watch window
+-   Evaluate Expressions
+-   Debug with embedded Lua interpreter(Lua 5.3.3 on Javascript by Emscripten)
+-   Debug with Your host program([require embed debug server](https://github.com/satoren/LRDB))
+-   Remote debugging over TCP
 
 ## Extension Settings
 
 launch.json example:
+
 ```
 {
     "version": "0.2.0",
@@ -41,4 +40,5 @@ launch.json example:
 ```
 
 ## Release Notes
+
 [CHANGELOG](CHANGELOG.md)

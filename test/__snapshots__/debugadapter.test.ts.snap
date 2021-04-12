@@ -1,0 +1,44 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`Lua Debug Adapter local check local_values 1`] = `
+Object {
+  "body": Object {
+    "variables": Array [
+      Object {
+        "name": "local_value1",
+        "type": "number",
+        "value": "1",
+      },
+      Object {
+        "name": "local_value2",
+        "type": "string",
+        "value": "\\"abc\\"",
+      },
+      Object {
+        "name": "local_value3",
+        "type": "number",
+        "value": "1",
+      },
+      Object {
+        "name": "local_value4",
+        "type": "object",
+        "value": "[4234.3]",
+        "variablesReference": 1003,
+      },
+    ],
+  },
+  "command": "variables",
+  "request_seq": 7,
+  "seq": 10,
+  "success": true,
+  "type": "response",
+}
+`;
+
+exports[`Lua Debug Adapter upvalues check upvalues 1`] = `
+Object {
+  "name": "a",
+  "type": "number",
+  "value": "1",
+}
+`;
