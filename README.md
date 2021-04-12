@@ -1,5 +1,7 @@
 # Lua Remote DeBugger for Visual Studio Code
 
+[![Node.js CI](https://github.com/satoren/vscode-lrdb/actions/workflows/main.yml/badge.svg)](https://github.com/satoren/vscode-lrdb/actions/workflows/main.yml)
+
 ## Introduction
 
 This extension is debug Lua programs with Visual Studio Code.
