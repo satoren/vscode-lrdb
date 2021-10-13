@@ -511,7 +511,7 @@ export class LuaDebugSession extends DebugSession {
       variablesData.forEach((v,i) => {
         const typename = typeof v
         const k = i + 1
-        const varRef = (typename == 'object') ? this._variableHandles.create(evalParam(k)) : undefined
+        const varRef = (typename == 'object') ? this._variableHandles.create(evalParam(k)) : 0
         variables.push({
           name: `${k}`,
           type: typename,
@@ -522,7 +522,7 @@ export class LuaDebugSession extends DebugSession {
     } else if (typeof variablesData === 'object') {
       for (const k in variablesData) {
         const typename = typeof variablesData[k]
-        const varRef =  (typename == 'object') ? this._variableHandles.create(evalParam(k)) : undefined
+        const varRef =  (typename == 'object') ? this._variableHandles.create(evalParam(k)) : 0
         variables.push({
           name: k,
           type: typename,
