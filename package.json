@@ -62,7 +62,7 @@
     "vsce": "^1.100.1",
     "vscode-debugadapter-testsupport": "^1.24.0",
     "vscode-debugprotocol": "^1.43.0",
-    "vscode-nls-dev": "^2.1.6",
+    "vscode-nls-dev": "^3.3.2",
     "vscode-test": "^1.4.1"
   },
   "icon": "images/icon.png",
