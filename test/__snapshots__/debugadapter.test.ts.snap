@@ -8,16 +8,19 @@ Object {
         "name": "local_value1",
         "type": "number",
         "value": "1",
+        "variablesReference": 0,
       },
       Object {
         "name": "local_value2",
         "type": "string",
         "value": "\\"abc\\"",
+        "variablesReference": 0,
       },
       Object {
         "name": "local_value3",
         "type": "number",
         "value": "1",
+        "variablesReference": 0,
       },
       Object {
         "name": "local_value4",
@@ -40,5 +43,6 @@ Object {
   "name": "a",
   "type": "number",
   "value": "1",
+  "variablesReference": 0,
 }
 `;
