@@ -283,6 +283,7 @@ describe('Lua Debug Adapter', () => {
               name: '_VERSION',
               type: 'string',
               value: '"Lua 5.3"',
+              variablesReference: 0
             })
         ))
     })
