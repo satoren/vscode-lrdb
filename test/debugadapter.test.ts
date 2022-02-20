@@ -70,7 +70,7 @@ describe('Lua Debug Adapter', () => {
   describe('initialize', () => {
     test('should return supported features', async () => {
       const response = await dc.initializeRequest()
-      expect(response.body.supportsConfigurationDoneRequest).toBe(true)
+      expect(response.body?.supportsConfigurationDoneRequest).toBe(true)
     })
 
     test("should produce error for invalid 'pathFormat'", async () => {
@@ -221,7 +221,7 @@ describe('Lua Debug Adapter', () => {
         .then((res) =>
           res.body.scopes.find((scope) => scope.name === 'Upvalues')
         )
-        .then((ref) => dc.variablesRequest(ref))
+        .then((ref) => dc.variablesRequest(ref!))
         .then((res) => expect(res.body.variables[0]).toMatchSnapshot())
     })
     test('check upvalue a', async () => {
@@ -277,7 +277,7 @@ describe('Lua Debug Adapter', () => {
       return dc
         .scopesRequest({ frameId: 0 })
         .then((res) => res.body.scopes.find((scope) => scope.name === 'Global'))
-        .then((ref) => dc.variablesRequest(ref))
+        .then((ref) => dc.variablesRequest(ref!))
         .then(((value) =>
               expect(value.body.variables).toContainEqual({
               name: '_VERSION',
@@ -313,7 +313,7 @@ describe('Lua Debug Adapter', () => {
       return dc
         .scopesRequest({ frameId: 0 })
         .then((res) => res.body.scopes.find((scope) => scope.name === 'Local'))
-        .then((ref) => dc.variablesRequest(ref))
+        .then((ref) => dc.variablesRequest(ref!))
         .then((res) => expect(res).toMatchSnapshot())
     })
     test('get local_value1', async () => {

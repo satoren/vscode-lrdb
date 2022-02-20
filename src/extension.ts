@@ -65,12 +65,6 @@ function createLaunchConfigFromContext(
   folder: vscode.WorkspaceFolder | undefined,
   resolve: boolean
 ): vscode.DebugConfiguration {
-  const config = {
-    type: 'lrdb',
-    request: 'launch',
-    name: localize('lrdb.launch.config.name', 'Launch Lua program'),
-  }
-
   let program: string | undefined
 
   // try to use file open in editor
@@ -94,8 +88,18 @@ function createLaunchConfigFromContext(
   }
 
   if (program) {
-    config['program'] = program
+    return {
+      type: 'lrdb',
+      request: 'launch',
+      name: localize('lrdb.launch.config.name', 'Launch Lua program'),
+      program
+    }
   }
 
-  return config
+  return {
+    type: 'lrdb',
+    request: 'launch',
+    name: localize('lrdb.launch.config.name', 'Launch Lua program'),
+  }
+
 }
