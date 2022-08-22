@@ -44,7 +44,7 @@
   "devDependencies": {
     "@semantic-release/changelog": "^6.0.0",
     "@semantic-release/git": "^10.0.0",
-    "@types/node": "^14.16.0",
+    "@types/node": "^18.7.9",
     "@types/vscode": "^1.52.0",
     "@typescript-eslint/eslint-plugin": "^4.33.0",
     "@typescript-eslint/parser": "^4.33.0",
