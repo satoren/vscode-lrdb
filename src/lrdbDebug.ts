@@ -11,11 +11,11 @@ import {
   Source,
   Handles,
   Breakpoint,
-} from 'vscode-debugadapter'
-import { DebugProtocol } from 'vscode-debugprotocol'
-import { readFileSync, existsSync } from 'fs'
-import { spawn, ChildProcess } from 'child_process'
-import * as path from 'path'
+} from '@vscode/debugadapter'
+import type { DebugProtocol } from '@vscode/debugprotocol'
+import { readFileSync, existsSync } from 'node:fs'
+import { spawn, type ChildProcess } from 'node:child_process'
+import * as path from 'node:path'
 import { LuaWasm, LRDBAdapter, LRDBClient } from 'lrdb-debuggable-lua'
 
 export interface LaunchRequestArguments
@@ -113,12 +113,12 @@ export class LuaDebugSession extends DebugSession {
    // args: DebugProtocol.InitializeRequestArguments
   ): void {
     if (this._debug_server_process) {
-      this._debug_server_process.kill()
-      delete this._debug_server_process
+      this._debug_server_process.kill("SIGABRT")
+      this._debug_server_process = undefined
     }
     if (this._debug_client) {
       this._debug_client.end()
-      delete this._debug_client
+      this._debug_client = undefined
     }
     if (response.body) {
       // This debug adapter implements the configurationDoneRequest.
@@ -311,10 +311,11 @@ export class LuaDebugSession extends DebugSession {
           break
         }
       }
-      const bp = <DebugProtocol.Breakpoint>(
-        new Breakpoint(verified, this.convertDebuggerLineToClient(l))
+      const bp = new Breakpoint(
+        verified,
+        this.convertDebuggerLineToClient(l)
       )
-      bp.id = this._breakPointID++
+      bp.setId(this._breakPointID++)
       breakpoints.push(bp)
       if (verified && this._debug_client) {
         const sendbreakpoint = {
@@ -509,7 +510,7 @@ export class LuaDebugSession extends DebugSession {
       }
     }
     const variables: DebugProtocol.Variable[] = []
-    if (variablesData instanceof Array) {
+    if (Array.isArray(variablesData)) {
       variablesData.forEach((v,i) => {
         const typename = typeof v
         const k = i + 1
@@ -596,12 +597,12 @@ export class LuaDebugSession extends DebugSession {
   //  args: DebugProtocol.DisconnectArguments
   ): void {
     if (this._debug_server_process) {
-      this._debug_server_process.kill()
-      delete this._debug_server_process
+      this._debug_server_process.kill("SIGABRT")
+      this._debug_server_process = undefined
     }
     if (this._debug_client) {
       this._debug_client.end()
-      delete this._debug_client
+      this._debug_client = undefined
     }
     this.sendResponse(response)
   }
@@ -619,7 +620,7 @@ export class LuaDebugSession extends DebugSession {
     const chunk = args.expression
     const requestParam = { stack_no: args.frameId, chunk: chunk, depth: 0 }
     this._debug_client.eval(requestParam).then((res) => {
-      if (res.result instanceof Array) {
+      if (Array.isArray(res.result)) {
         const ret = res.result.map(v => stringify(v)).join('	')
         let varRef = 0
         if (res.result.length == 1) {

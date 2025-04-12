@@ -5,15 +5,15 @@
   "version": "0.4.1",
   "publisher": "satoren",
   "engines": {
-    "vscode": "^1.52.0"
+    "vscode": "^1.80.0"
   },
   "categories": [
     "Debuggers"
   ],
   "dependencies": {
-    "lrdb-debuggable-lua": "^0.5.4",
-    "vscode-debugadapter": "^1.43.0",
-    "vscode-nls": "^5.0.0"
+    "@vscode/debugadapter": "^1.51.0",
+    "lrdb-debuggable-lua": "^0.7.0",
+    "vscode-nls": "^5.2.0"
   },
   "activationEvents": [
     "onDebug"
@@ -29,40 +29,38 @@
   "scripts": {
     "vscode:prepublish": "tsc -p ./",
     "compile": "tsc -watch -p ./",
-    "package": "vsce package",
-    "publish": "vsce publish",
+    "package": "@vscode/vsce package",
+    "publish": "@vscode/vsce publish",
     "build": "tsc",
-    "jest": "jest",
-    "test": "run-s build jest",
+    "vitest": "vitest run",
+    "test": "run-s build vitest",
     "lint:eslint": "eslint . --cache --ext ts",
     "lint:prettier": "prettier . --check",
     "lint": "run-s lint:eslint lint:prettier",
     "fix": "run-s fix:eslint fix:prettier",
-    "fix:eslint": "yarn lint:eslint --fix",
-    "fix:prettier": "yarn lint:prettier --write"
+    "fix:eslint": "npm run lint:eslint -- --fix",
+    "fix:prettier": "npm run lint:prettier -- --write"
   },
   "devDependencies": {
-    "@semantic-release/changelog": "^6.0.0",
-    "@semantic-release/git": "^10.0.0",
-    "@types/node": "^14.16.0",
-    "@types/vscode": "^1.77.0",
-    "@typescript-eslint/eslint-plugin": "^4.33.0",
-    "@typescript-eslint/parser": "^4.33.0",
-    "eslint": "^7.15.0",
-    "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-jest": "^25.2.2",
-    "jest": "^26.6.3",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@types/node": "^20.11.5",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vscode/debugadapter-testsupport": "^1.51.0",
+    "@vscode/debugprotocol": "^1.51.0",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
     "npm-run-all": "^4.1.5",
-    "prettier": "^2.4.1",
-    "semantic-release": "^20.0.2",
+    "prettier": "^3.2.4",
+    "semantic-release": "^23.0.0",
     "semantic-release-vsce": "^5.5.3",
-    "ts-jest": "^26.4.4",
-    "ts-node": "^10.3.0",
-    "typescript": "^4.4.4",
-    "vsce": "^2.15.0",
-    "vscode-debugadapter-testsupport": "^1.49.0",
-    "vscode-debugprotocol": "^1.49.0",
-    "vscode-nls-dev": "^3.3.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3",
+    "vitest": "^3.1.1",
+    "vscode-nls-dev": "^4.0.4",
     "vscode-test": "^1.6.1"
   },
   "icon": "images/icon.png",
@@ -222,5 +220,6 @@
         }
       ]
     ]
-  }
+  },
+  "packageManager": "npm@10.2.3"
 }
